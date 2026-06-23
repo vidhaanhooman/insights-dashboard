@@ -28,6 +28,7 @@ import type { Metric, TimeRange, Widget } from "@/lib/insights/types"
 import { cn } from "@/lib/utils"
 import { AppSidebar } from "./app-sidebar"
 import { ConversationsChart } from "./conversations-chart"
+import { InboundView } from "./inbound-view"
 import { KpiStrip } from "./kpi-strip"
 import { SegmentedToggle } from "./segmented-toggle"
 import { WidgetBuilder } from "./widget-builder"
@@ -242,6 +243,8 @@ export function InsightsDashboard() {
               </>
             )}
           </div>
+        ) : tab === "Inbound" ? (
+          <InboundView range={range} refreshKey={refreshKey} />
         ) : (
           <div className="flex flex-1 items-center justify-center p-5">
             <p className="text-sm text-text-muted">{tab} — coming soon</p>

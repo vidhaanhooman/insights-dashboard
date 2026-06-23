@@ -51,6 +51,8 @@ export interface DayPoint {
   inboundDur: number
   outboundDur: number
   running: number
+  inboundTransfers: number
+  csat: number
 }
 
 function seededDaily(): DayPoint[] {
@@ -61,15 +63,18 @@ function seededDaily(): DayPoint[] {
     // a mid-window bump so the line chart has a recognizable peak
     const bump = Math.max(0, 1 - Math.abs(d - 4) / 4)
     const outbound = Math.round(6 + rnd() * 10 + bump * 40)
+    const inbound = Math.round(8 + rnd() * 12 + bump * 10)
     out.push({
       dayAgo: d,
-      inbound: Math.round(1 + rnd() * 4),
+      inbound,
       outbound,
       web: Math.round(4 + rnd() * 8 + bump * 30),
       tasksCreated: Math.round(2 + rnd() * 6),
       inboundDur: Math.round(15 + rnd() * 20),
       outboundDur: Math.round(50 + rnd() * 60),
       running: 0,
+      inboundTransfers: Math.round(inbound * (0.1 + rnd() * 0.2)),
+      csat: 3.8 + rnd() * 1.2,
     })
   }
   return out

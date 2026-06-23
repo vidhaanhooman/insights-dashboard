@@ -10,12 +10,14 @@ import {
   resolveAgentTable,
   resolveConversations,
   resolveGrouped,
+  resolveInboundSummary,
   resolveKpiSummary,
   resolveScalar,
   resolveSeries,
   type AgentRow,
   type ConversationPoint,
   type GroupPoint,
+  type InboundSummary,
   type KpiSummary,
   type SeriesPoint,
 } from "./resolver"
@@ -102,6 +104,19 @@ export function useKpiSummary(
   const loading = useLoadingFor(`kpi|${range}|${refreshKey}`)
   const data = React.useMemo(
     () => resolveKpiSummary(range),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [range, refreshKey]
+  )
+  return { data, loading }
+}
+
+export function useInboundSummary(
+  range: TimeRange,
+  refreshKey = 0
+): DataResult<InboundSummary> {
+  const loading = useLoadingFor(`inbound|${range}|${refreshKey}`)
+  const data = React.useMemo(
+    () => resolveInboundSummary(range),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [range, refreshKey]
   )

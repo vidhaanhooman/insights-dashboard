@@ -25,10 +25,10 @@ import type { TimeRange } from "@/lib/insights/types"
 import { SegmentedToggle } from "./segmented-toggle"
 
 const config = {
-  Inbound: { label: "Inbound", color: "#4164ff" },
-  Outbound: { label: "Outbound", color: "#fe6237" },
-  Web: { label: "Web", color: "#ffb62e" },
-  Tasks: { label: "Tasks created", color: "#7cc3ff" },
+  Inbound: { label: "Inbound", color: "#6e86e0" },
+  Outbound: { label: "Outbound", color: "#ef9b80" },
+  Web: { label: "Web", color: "#efc97e" },
+  Tasks: { label: "Tasks created", color: "#a4cdee" },
 } satisfies ChartConfig
 
 type SeriesKey = keyof typeof config

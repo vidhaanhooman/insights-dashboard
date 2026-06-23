@@ -171,6 +171,32 @@ export function resolveKpiSummary(range: TimeRange): KpiSummary {
   }
 }
 
+export interface InboundSummary {
+  received: number
+  avgDur: number
+  transferRate: number
+  csat: number
+}
+
+export function resolveInboundSummary(range: TimeRange): InboundSummary {
+  const span = RANGE_DAYS[range]
+  const days = DAILY.filter((d) => d.dayAgo < span)
+  const received = days.reduce((a, d) => a + d.inbound, 0)
+  const transfers = days.reduce((a, d) => a + d.inboundTransfers, 0)
+  const avgDur = days.length
+    ? days.reduce((a, d) => a + d.inboundDur, 0) / days.length
+    : 0
+  const csat = days.length
+    ? days.reduce((a, d) => a + d.csat, 0) / days.length
+    : 0
+  return {
+    received,
+    avgDur,
+    transferRate: received ? (transfers / received) * 100 : 0,
+    csat,
+  }
+}
+
 // Type-aware formatting — the one place a metric's `format` becomes a display string.
 export function formatValue(value: number | null, format: MetricFormat): string {
   if (value == null) return "—"

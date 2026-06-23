@@ -82,11 +82,11 @@
   --input: var(--border-strong);
   --ring: var(--brand);
   --radius: 0.625rem;
-  --chart-1: #4164ff;
-  --chart-2: #fe6237;
-  --chart-3: #ffb62e;
-  --chart-4: #7cc3ff;
-  --chart-5: #8a94a6;
+  --chart-1: #6e86e0;
+  --chart-2: #ef9b80;
+  --chart-3: #efc97e;
+  --chart-4: #a4cdee;
+  --chart-5: #9aa3b2;
 }
 
 /* Dark theme (default — html carries the `dark` class) */
