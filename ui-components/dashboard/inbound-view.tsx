@@ -28,10 +28,10 @@ export function InboundView({
 
   const d = summary.data
   const stats = [
-    { label: "Calls Received", icon: PhoneIncoming, value: formatValue(d.received, "count") },
-    { label: "Avg Duration", icon: Clock, value: formatValue(d.avgDur, "duration") },
-    { label: "Transfer Rate", icon: Split, value: formatValue(d.transferRate, "percent") },
-    { label: "CSAT", icon: Star, value: d.csat.toFixed(1) },
+    { label: "Calls Received", icon: PhoneIncoming, value: formatValue(d.received, "count"), breakdown: true },
+    { label: "Avg Duration", icon: Clock, value: formatValue(d.avgDur, "duration"), breakdown: false },
+    { label: "Transfer Rate", icon: Split, value: formatValue(d.transferRate, "percent"), breakdown: false },
+    { label: "CSAT", icon: Star, value: d.csat.toFixed(1), breakdown: false },
   ]
 
   return (

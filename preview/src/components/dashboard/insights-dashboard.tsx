@@ -10,7 +10,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import { RANGE_LABEL } from "@/lib/insights/mock-data"
+import { DateRangePicker } from "@/components/date-range-picker"
 import { SYSTEM_METRICS } from "@/lib/insights/registry"
 import type { Metric, TimeRange, Widget } from "@/lib/insights/types"
 import { cn } from "@/lib/utils"
@@ -18,7 +18,6 @@ import { AppSidebar } from "./app-sidebar"
 import { ChartToolbar } from "./chart-toolbar"
 import { AgentPicker } from "./agent-picker"
 import { ConversationsChart } from "./conversations-chart"
-import { Dropdown } from "./dropdown"
 import { InboundView } from "./inbound-view"
 import { OutboundView } from "./outbound-view"
 import { KpiStrip } from "./kpi-strip"
@@ -31,7 +30,9 @@ const TABS = ["Overview", "Outbound", "Inbound", "Tasks", "Tools"] as const
 type Tab = (typeof TABS)[number]
 
 export function InsightsDashboard() {
-  const [range, setRange] = React.useState<TimeRange>("7d")
+  const [range] = React.useState<TimeRange>("7d")
+  const [dateStart, setDateStart] = React.useState("2026-06-16T00:00")
+  const [dateEnd, setDateEnd] = React.useState("2026-06-23T23:59")
   const [tab, setTab] = React.useState<Tab>("Overview")
   const [agentId, setAgentId] = React.useState("")
   // Each tab owns its own dashboard of widgets.
@@ -199,15 +200,13 @@ export function InsightsDashboard() {
         </header>
 
         <div className="flex items-center gap-3 px-5 pt-4">
-          <Dropdown
-            aria-label="Time range"
-            className="w-[160px]"
-            value={range}
-            onChange={(v) => setRange(v as TimeRange)}
-            options={(Object.keys(RANGE_LABEL) as TimeRange[]).map((r) => ({
-              value: r,
-              label: RANGE_LABEL[r],
-            }))}
+          <DateRangePicker
+            startValue={dateStart}
+            endValue={dateEnd}
+            onApply={(s, e) => {
+              setDateStart(s)
+              setDateEnd(e)
+            }}
           />
           <AgentPicker agentId={agentId} onChange={setAgentId} />
         </div>

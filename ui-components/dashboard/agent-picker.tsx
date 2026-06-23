@@ -67,7 +67,7 @@ export function AgentPicker({
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <Button variant="outline" className={className}>
+        <Button variant="outline" className={cn("h-9 px-3", className)}>
           <Filter className="size-3.5" />
           Filter
           {agent && (
@@ -150,17 +150,17 @@ export function AgentPicker({
             )}
           </div>
           <div className="flex items-center justify-between border-t border-border p-2">
-            <Button
-              variant="ghost"
-              size="sm"
+            <button
+              type="button"
               disabled={!agentId}
               onClick={() => {
                 onChange("")
                 setOpen(false)
               }}
+              className="rounded-md border border-border-strong px-3 py-1.5 text-xs text-text-dim hover:text-text disabled:opacity-40 disabled:hover:text-text-dim"
             >
               Clear
-            </Button>
+            </button>
             <span className="px-1 text-[11px] text-text-muted">
               {agentId ? "1 selected" : "None selected"}
             </span>

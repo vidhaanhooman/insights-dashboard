@@ -45,6 +45,7 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { ChartToolbar } from "@/components/dashboard/chart-toolbar"
 import { SegmentedToggle } from "@/components/dashboard/segmented-toggle"
 import { MetricBreakdown } from "@/components/dashboard/widgets/metric-breakdown"
+import { MetricDetail } from "@/components/dashboard/widgets/metric-detail"
 import { StatBody } from "@/components/dashboard/widgets/stat-body"
 import type { TimeRange } from "@/lib/insights/types"
 import { cn } from "@/lib/utils"
@@ -61,6 +62,10 @@ export interface Stat {
   label: string
   value: string
   icon: LucideIcon
+  /** Whether an agent breakdown chart makes sense for this metric (counts yes; rates/durations no). */
+  breakdown?: boolean
+  /** Use the fuller 5-panel detail layout on enlarge. */
+  fullDetail?: boolean
 }
 
 export function StatCards({
@@ -73,6 +78,9 @@ export function StatCards({
   refreshKey?: number
 }) {
   const [expanded, setExpanded] = React.useState<string | null>(null)
+  const expandedStat = items.find((s) => s.label === expanded)
+  // Counts → simple horizontal bar breakdown; rates/scores → full detail layout.
+  const barOnly = expandedStat?.breakdown === true
   return (
     <>
       <div className="grid grid-cols-2 gap-3.5 lg:grid-cols-4">
@@ -96,12 +104,26 @@ export function StatCards({
       </div>
 
       <Dialog open={!!expanded} onOpenChange={(o) => !o && setExpanded(null)}>
-        <DialogContent className="sm:max-w-3xl">
+        <DialogContent
+          className={cn(
+            "max-h-[90vh] overflow-y-auto",
+            barOnly ? "sm:max-w-3xl" : "sm:max-w-6xl"
+          )}
+        >
           <DialogHeader>
-            <DialogTitle>{expanded}</DialogTitle>
+            <DialogTitle>{barOnly ? expanded : `${expanded} details`}</DialogTitle>
           </DialogHeader>
           <ChartToolbar />
-          <MetricBreakdown range={range} refreshKey={refreshKey} />
+          {barOnly ? (
+            <MetricBreakdown range={range} refreshKey={refreshKey} />
+          ) : (
+            <MetricDetail
+              label={expanded ?? ""}
+              range={range}
+              refreshKey={refreshKey}
+              full={expandedStat?.fullDetail}
+            />
+          )}
         </DialogContent>
       </Dialog>
     </>
@@ -400,7 +422,7 @@ export function TablePanel({
           {columns.map((c) => (
             <TableHead
               key={c.key}
-              className={c.numeric ? "text-right" : undefined}
+              className={cn("first:pl-5 last:pr-5", c.numeric && "text-right")}
             >
               {c.label}
             </TableHead>
@@ -414,6 +436,7 @@ export function TablePanel({
               <TableCell
                 key={c.key}
                 className={cn(
+                  "first:pl-5 last:pr-5",
                   c.numeric && "text-right tabular-nums",
                   c.key === columns[0].key && "font-medium"
                 )}

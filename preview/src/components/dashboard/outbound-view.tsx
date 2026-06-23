@@ -29,10 +29,10 @@ export function OutboundView({
 
   const d = summary.data
   const stats = [
-    { label: "Calls Attempted", icon: PhoneOutgoing, value: formatValue(d.attempted, "count") },
-    { label: "Calls Connected", icon: PhoneCall, value: formatValue(d.connected, "count") },
-    { label: "Avg Duration", icon: Clock, value: formatValue(d.avgDur, "duration") },
-    { label: "Pickup Rate", icon: Percent, value: formatValue(d.pickup, "percent") },
+    { label: "Calls Attempted", icon: PhoneOutgoing, value: formatValue(d.attempted, "count"), breakdown: true },
+    { label: "Calls Connected", icon: PhoneCall, value: formatValue(d.connected, "count"), breakdown: true },
+    { label: "Avg Duration", icon: Clock, value: formatValue(d.avgDur, "duration"), breakdown: false },
+    { label: "Pickup Rate", icon: Percent, value: formatValue(d.pickup, "percent"), breakdown: false, fullDetail: true },
   ]
 
   return (

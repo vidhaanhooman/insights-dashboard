@@ -222,6 +222,71 @@ export function resolveKpiSummary(range: TimeRange): KpiSummary {
   }
 }
 
+// ---- Metric detail (enlarged stat) data ----
+
+export interface NumberWiseRow {
+  from: string
+  pickup: number
+  calls: number
+  [key: string]: string | number
+}
+
+export function resolveNumberWise(range: TimeRange): NumberWiseRow[] {
+  let s = 131 + RANGE_DAYS[range]
+  const rnd = () => ((s = (s * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff)
+  const rows: NumberWiseRow[] = []
+  for (let i = 0; i < 14; i++) {
+    const calls = Math.round(rnd() * (RANGE_DAYS[range] + 1))
+    const pickup = calls ? Math.round(rnd() * 100) : 0
+    rows.push({ from: `+91803531${60 + i}${Math.floor(rnd() * 90) + 10}`, pickup, calls })
+  }
+  return rows.sort((a, b) => a.from.localeCompare(b.from))
+}
+
+export interface AttemptWiseRow {
+  attempt: string
+  pickup: number
+  [key: string]: string | number
+}
+
+export function resolveAttemptWise(range: TimeRange): AttemptWiseRow[] {
+  const ev = EVENTS.filter((e) => inRange(e, range))
+  const map: Record<string, { calls: number; conn: number }> = {}
+  ev.forEach((e) => {
+    const k = `Attempt ${1 + (e.hour % 3)}`
+    const m = map[k] ?? (map[k] = { calls: 0, conn: 0 })
+    m.calls++
+    if (e.connected) m.conn++
+  })
+  return Object.entries(map)
+    .map(([attempt, { calls, conn }]) => ({
+      attempt,
+      pickup: calls ? Math.round((conn / calls) * 100) : 0,
+    }))
+    .sort((a, b) => a.attempt.localeCompare(b.attempt))
+}
+
+// Pickup rate over time (hourly for today, otherwise per day).
+export function resolvePickupByTime(range: TimeRange): MetricPoint[] {
+  const span = RANGE_DAYS[range]
+  const out: MetricPoint[] = []
+  const pct = (ev: CallEvent[]) =>
+    ev.length
+      ? Math.round((ev.filter((e) => e.connected).length / ev.length) * 100)
+      : 0
+  if (range === "today") {
+    for (let h = 0; h < 24; h++) {
+      const ev = EVENTS.filter((e) => e.dayAgo === 0 && e.hour === h)
+      out.push({ label: `${h}:00`, value: pct(ev) })
+    }
+  } else {
+    for (let d = span - 1; d >= 0; d--) {
+      out.push({ label: `D-${d}`, value: pct(EVENTS.filter((e) => e.dayAgo === d)) })
+    }
+  }
+  return out
+}
+
 export interface OutboundSummary {
   attempted: number
   connected: number

@@ -8,6 +8,7 @@
 import * as React from "react"
 import {
   resolveAgentTable,
+  resolveAttemptWise,
   resolveConversations,
   resolveGrouped,
   resolveInboundAgentTable,
@@ -15,10 +16,13 @@ import {
   resolveInboundSummary,
   resolveKpiSummary,
   resolveMetricSeries,
+  resolveNumberWise,
   resolveOutboundSummary,
+  resolvePickupByTime,
   resolveScalar,
   resolveSeries,
   type AgentRow,
+  type AttemptWiseRow,
   type ConversationPoint,
   type GroupPoint,
   type InboundAgentRow,
@@ -26,6 +30,7 @@ import {
   type InboundSummary,
   type KpiSummary,
   type MetricPoint,
+  type NumberWiseRow,
   type OutboundSummary,
   type SeriesPoint,
 } from "./resolver"
@@ -180,6 +185,45 @@ export function useInboundAgentTable(
   const loading = useLoadingFor(`inboundagents|${range}|${refreshKey}`)
   const data = React.useMemo(
     () => resolveInboundAgentTable(range),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [range, refreshKey]
+  )
+  return { data, loading }
+}
+
+export function useNumberWise(
+  range: TimeRange,
+  refreshKey = 0
+): DataResult<NumberWiseRow[]> {
+  const loading = useLoadingFor(`numberwise|${range}|${refreshKey}`)
+  const data = React.useMemo(
+    () => resolveNumberWise(range),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [range, refreshKey]
+  )
+  return { data, loading }
+}
+
+export function useAttemptWise(
+  range: TimeRange,
+  refreshKey = 0
+): DataResult<AttemptWiseRow[]> {
+  const loading = useLoadingFor(`attemptwise|${range}|${refreshKey}`)
+  const data = React.useMemo(
+    () => resolveAttemptWise(range),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [range, refreshKey]
+  )
+  return { data, loading }
+}
+
+export function usePickupByTime(
+  range: TimeRange,
+  refreshKey = 0
+): DataResult<MetricPoint[]> {
+  const loading = useLoadingFor(`pickupbytime|${range}|${refreshKey}`)
+  const data = React.useMemo(
+    () => resolvePickupByTime(range),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [range, refreshKey]
   )
