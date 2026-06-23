@@ -44,7 +44,9 @@ import {
 import { Skeleton } from "@/components/ui/skeleton"
 import { ChartToolbar } from "@/components/dashboard/chart-toolbar"
 import { SegmentedToggle } from "@/components/dashboard/segmented-toggle"
+import { MetricBreakdown } from "@/components/dashboard/widgets/metric-breakdown"
 import { StatBody } from "@/components/dashboard/widgets/stat-body"
+import type { TimeRange } from "@/lib/insights/types"
 import { cn } from "@/lib/utils"
 
 const PALETTE = [
@@ -61,15 +63,48 @@ export interface Stat {
   icon: LucideIcon
 }
 
-export function StatCards({ items }: { items: Stat[] }) {
+export function StatCards({
+  items,
+  range = "today",
+  refreshKey = 0,
+}: {
+  items: Stat[]
+  range?: TimeRange
+  refreshKey?: number
+}) {
+  const [expanded, setExpanded] = React.useState<string | null>(null)
   return (
-    <div className="grid grid-cols-2 gap-3.5 lg:grid-cols-4">
-      {items.map((s) => (
-        <Card key={s.label} className="flex flex-col gap-0 p-4">
-          <StatBody icon={s.icon} label={s.label} value={s.value} />
-        </Card>
-      ))}
-    </div>
+    <>
+      <div className="grid grid-cols-2 gap-3.5 lg:grid-cols-4">
+        {items.map((s) => (
+          <Card
+            key={s.label}
+            className="group relative flex flex-col gap-0 p-4"
+          >
+            <Button
+              variant="ghost"
+              size="icon"
+              aria-label="Enlarge"
+              onClick={() => setExpanded(s.label)}
+              className="absolute right-3 top-3 size-7 text-text-muted opacity-0 transition-opacity group-hover:opacity-100"
+            >
+              <Maximize2 className="size-3.5" />
+            </Button>
+            <StatBody icon={s.icon} label={s.label} value={s.value} />
+          </Card>
+        ))}
+      </div>
+
+      <Dialog open={!!expanded} onOpenChange={(o) => !o && setExpanded(null)}>
+        <DialogContent className="sm:max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>{expanded}</DialogTitle>
+          </DialogHeader>
+          <ChartToolbar />
+          <MetricBreakdown range={range} refreshKey={refreshKey} />
+        </DialogContent>
+      </Dialog>
+    </>
   )
 }
 

@@ -36,7 +36,7 @@ export function InboundView({
 
   return (
     <div className="space-y-3.5 p-5">
-      <StatCards items={stats} />
+      <StatCards items={stats} range={range} refreshKey={refreshKey} />
 
       <div className="grid grid-cols-1 gap-3.5 lg:grid-cols-3">
         <div className="lg:col-span-2">
