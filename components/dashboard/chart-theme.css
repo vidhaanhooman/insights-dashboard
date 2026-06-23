@@ -1,0 +1,20 @@
+/* Paste these custom properties into your globals.css, inside the existing
+   :root and .dark blocks. They define the categorical chart palette that every
+   chart above references via var(--chart-1)..var(--chart-5).
+   Palette: purple / teal / coral / blue / amber — AWS-style, semantic-friendly. */
+
+:root {
+  --chart-1: oklch(0.62 0.19 280); /* purple  */
+  --chart-2: oklch(0.65 0.14 165); /* teal    */
+  --chart-3: oklch(0.65 0.18 35);  /* coral   */
+  --chart-4: oklch(0.62 0.16 250); /* blue    */
+  --chart-5: oklch(0.72 0.16 70);  /* amber   */
+}
+
+.dark {
+  --chart-1: oklch(0.70 0.17 280);
+  --chart-2: oklch(0.72 0.13 165);
+  --chart-3: oklch(0.70 0.17 35);
+  --chart-4: oklch(0.70 0.15 250);
+  --chart-5: oklch(0.78 0.15 70);
+}
