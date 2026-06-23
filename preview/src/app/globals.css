@@ -52,6 +52,7 @@
 /* Light theme (styleguide convention: [data-theme="light"]) */
 :root,
 [data-theme="light"] {
+  color-scheme: light;
   --bg: #ffffff;
   --surface: #ffffff;
   --surface-2: #f4f4f5;
@@ -82,15 +83,16 @@
   --input: var(--border-strong);
   --ring: var(--brand);
   --radius: 0.625rem;
-  --chart-1: #6e86e0;
-  --chart-2: #ef9b80;
-  --chart-3: #efc97e;
-  --chart-4: #a4cdee;
-  --chart-5: #9aa3b2;
+  --chart-1: #3a6ae6;
+  --chart-2: #6f9cf6;
+  --chart-3: #2546b3;
+  --chart-4: #a9caff;
+  --chart-5: #5f79c9;
 }
 
 /* Dark theme (default — html carries the `dark` class) */
 .dark {
+  color-scheme: dark;
   --bg: #0a0a0a;
   --surface: #161616;
   --surface-2: #1f1f1f;
