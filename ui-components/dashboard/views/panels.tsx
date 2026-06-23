@@ -248,6 +248,18 @@ export function LinePanel({
     series.map((s) => [s.key, { label: s.label, color: s.color }])
   ) satisfies ChartConfig
 
+  const [visible, setVisible] = React.useState<Set<string>>(
+    () => new Set(series.map((s) => s.key))
+  )
+  // Click a series to isolate it; click the isolated one again to restore all.
+  function isolate(key: string) {
+    setVisible((prev) =>
+      prev.size === 1 && prev.has(key)
+        ? new Set(series.map((s) => s.key))
+        : new Set([key])
+    )
+  }
+
   return (
     <PanelCard title={title} onEdit={onEdit}>
       {loading ? (
@@ -266,24 +278,33 @@ export function LinePanel({
               />
               <YAxis tickLine={false} axisLine={false} width={32} allowDecimals={false} />
               <ChartTooltip content={<ChartTooltipContent />} />
-              {series.map((s) => (
-                <Line
-                  key={s.key}
-                  dataKey={s.key}
-                  type="monotone"
-                  stroke={`var(--color-${s.key})`}
-                  strokeWidth={2}
-                  dot={false}
-                />
-              ))}
+              {series
+                .filter((s) => visible.has(s.key))
+                .map((s) => (
+                  <Line
+                    key={s.key}
+                    dataKey={s.key}
+                    type="monotone"
+                    stroke={`var(--color-${s.key})`}
+                    strokeWidth={2}
+                    dot={false}
+                  />
+                ))}
             </LineChart>
           </ChartContainer>
-          <div className="mt-2 flex justify-center gap-4 text-xs text-text-muted">
+          <div className="mt-2 flex justify-center gap-2 text-xs">
             {series.map((s) => (
-              <span key={s.key} className="flex items-center gap-1.5">
+              <button
+                key={s.key}
+                onClick={() => isolate(s.key)}
+                className={cn(
+                  "flex items-center gap-1.5 rounded-md px-1.5 py-0.5 transition-opacity hover:bg-surface-2",
+                  visible.has(s.key) ? "text-text-muted" : "opacity-40"
+                )}
+              >
                 <span className="size-2 rounded-full" style={{ background: s.color }} />
                 {s.label}
-              </span>
+              </button>
             ))}
           </div>
         </>
