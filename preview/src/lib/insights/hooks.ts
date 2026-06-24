@@ -11,6 +11,7 @@ import {
   resolveAttemptWise,
   resolveConversations,
   resolveGrouped,
+  resolveHeatmap,
   resolveInboundAgentTable,
   resolveInboundSeries,
   resolveInboundSummary,
@@ -25,6 +26,7 @@ import {
   type AttemptWiseRow,
   type ConversationPoint,
   type GroupPoint,
+  type HeatmapData,
   type InboundAgentRow,
   type InboundSeriesPoint,
   type InboundSummary,
@@ -85,6 +87,19 @@ export function useMetricSeries(
     () => (metric ? resolveMetricSeries(metric, range) : []),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [metric, range, refreshKey]
+  )
+  return { data, loading }
+}
+
+export function useHeatmap(
+  range: TimeRange,
+  refreshKey = 0
+): DataResult<HeatmapData> {
+  const loading = useLoadingFor(`heatmap|${range}|${refreshKey}`)
+  const data = React.useMemo(
+    () => resolveHeatmap(range),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [range, refreshKey]
   )
   return { data, loading }
 }

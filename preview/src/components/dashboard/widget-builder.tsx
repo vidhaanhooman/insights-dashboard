@@ -23,7 +23,7 @@ import {
 } from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
 import { RANGE_LABEL } from "@/lib/insights/mock-data"
-import { SYSTEM_METRICS, VIZ, SPAN_FOR_TYPE } from "@/lib/insights/registry"
+import { SYSTEM_METRICS, VIZ, SPAN_FOR_TYPE, SCALAR_TYPES } from "@/lib/insights/registry"
 import type {
   GroupField,
   Metric,
@@ -248,7 +248,7 @@ function BuilderForm({
     }
 
     const config: WidgetPatch["config"] = {}
-    if (viz !== "number" && groupBy !== "None") {
+    if (!SCALAR_TYPES.includes(viz) && groupBy !== "None") {
       config.groupBy = groupBy
       if (groupBy === "time") config.viewBy = viewBy
     }
@@ -351,7 +351,7 @@ function BuilderForm({
             </div>
           </div>
 
-        {viz !== "number" && (
+        {!SCALAR_TYPES.includes(viz) && (
           <div className="space-y-3">
             <SectionLabel>Grouping</SectionLabel>
             <div className="flex gap-3">

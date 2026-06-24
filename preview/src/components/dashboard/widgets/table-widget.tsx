@@ -48,7 +48,7 @@ export function TableWidget({
           </TableHeader>
           <TableBody>
             {data.map((r) => (
-              <TableRow key={r.agent}>
+              <TableRow key={r.agent} className="border-border-strong">
                 <TableCell className="font-medium">{r.agent}</TableCell>
                 <TableCell className="text-right tabular-nums">
                   {r.calls}

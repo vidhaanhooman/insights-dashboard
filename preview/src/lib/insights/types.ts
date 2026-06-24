@@ -22,7 +22,13 @@ export interface Metric {
   source: MetricSource
 }
 
-export type WidgetType = "number" | "line" | "bar" | "pie" | "table"
+export type WidgetType =
+  | "number"
+  | "line"
+  | "bar"
+  | "pie"
+  | "table"
+  | "heatmap"
 
 export type ViewByGranularity = "Hour" | "Day" | "Month"
 

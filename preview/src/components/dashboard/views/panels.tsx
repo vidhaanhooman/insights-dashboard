@@ -138,6 +138,7 @@ export interface EnlargedView {
 
 export function PanelCard({
   title,
+  description,
   className,
   children,
   enlargedViews,
@@ -145,6 +146,8 @@ export function PanelCard({
   dialogClassName = "sm:max-w-4xl",
 }: {
   title: string
+  /** Optional muted subtitle under the panel title. */
+  description?: string
   className?: string
   children: React.ReactNode
   /** Optional alternate views shown (with a toggle) in the enlarge dialog. */
@@ -164,7 +167,14 @@ export function PanelCard({
     <>
       <Card className={cn("group gap-0 overflow-hidden py-0", className)}>
         <CardHeader className="flex flex-row items-center gap-2 space-y-0 border-b px-5 py-3">
-          <span className="text-sm font-medium">{title}</span>
+          <div className="min-w-0">
+            <span className="block text-sm font-medium">{title}</span>
+            {description && (
+              <span className="mt-0.5 block truncate text-xs text-text-muted">
+                {description}
+              </span>
+            )}
+          </div>
           <div className="ml-auto flex items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
             <Button
               variant="ghost"
@@ -255,12 +265,14 @@ export interface LineSeries {
 
 export function LinePanel({
   title,
+  description,
   data,
   series,
   loading,
   onEdit,
 }: {
   title: string
+  description?: string
   data: Record<string, string | number>[]
   series: LineSeries[]
   loading?: boolean
@@ -283,7 +295,7 @@ export function LinePanel({
   }
 
   return (
-    <PanelCard title={title} onEdit={onEdit}>
+    <PanelCard title={title} description={description} onEdit={onEdit}>
       {loading ? (
         <Skeleton className="h-[260px] w-full" />
       ) : (
@@ -335,56 +347,166 @@ export function LinePanel({
   )
 }
 
+/**
+ * Interactive pie/donut: hovering a slice (or its legend row) lifts that
+ * segment and dims the rest. Sized to a fixed square so it stays compact in
+ * the card and scales up cleanly in the enlarge dialog.
+ */
+function Donut({
+  data,
+  total,
+  donut,
+  legend,
+  size,
+}: {
+  data: { name: string; value: number }[]
+  total: number
+  donut?: boolean
+  legend: "right" | "bottom"
+  size: number
+}) {
+  const [active, setActive] = React.useState<number | null>(null)
+  const stacked = legend === "bottom"
+  const outer = size / 2 - 6
+  const inner = donut ? Math.round(outer * 0.62) : 0
+
+  return (
+    <div
+      className={cn(
+        "flex gap-5",
+        stacked
+          ? "h-full flex-col items-center justify-center"
+          : "h-full items-center justify-between pr-4"
+      )}
+    >
+      <ChartContainer
+        config={{ value: { label: "Calls" } } satisfies ChartConfig}
+        className="shrink-0"
+        style={{ height: size, width: size }}
+      >
+        <PieChart>
+          <ChartTooltip cursor={false} content={<ChartTooltipContent hideLabel />} />
+          <Pie
+            data={data}
+            dataKey="value"
+            nameKey="name"
+            outerRadius={outer}
+            innerRadius={inner}
+            stroke="0"
+            onMouseEnter={(_, i) => setActive(i)}
+            onMouseLeave={() => setActive(null)}
+          >
+            {data.map((_, i) => (
+              <Cell
+                key={i}
+                fill={PALETTE[i % PALETTE.length]}
+                opacity={active === null || active === i ? 1 : 0.35}
+              />
+            ))}
+          </Pie>
+        </PieChart>
+      </ChartContainer>
+      <ul
+        className={cn(
+          "text-xs",
+          stacked
+            ? "flex flex-wrap items-center justify-center gap-x-4 gap-y-1.5"
+            : "shrink-0 space-y-1.5"
+        )}
+      >
+        {data.map((d, i) => (
+          <li
+            key={d.name}
+            onMouseEnter={() => setActive(i)}
+            onMouseLeave={() => setActive(null)}
+            className={cn(
+              "flex cursor-default items-center gap-2.5 rounded px-1 py-0.5 transition-opacity",
+              active !== null && active !== i && "opacity-40"
+            )}
+          >
+            <span
+              className="size-2.5 shrink-0 rounded-[2px]"
+              style={{ background: PALETTE[i % PALETTE.length] }}
+            />
+            <span>{d.name}</span>
+            <span className="ml-2 tabular-nums text-text-muted">
+              {Math.round((d.value / total) * 100)}%
+            </span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  )
+}
+
 export function PiePanel({
   title,
+  description,
   data,
   loading,
   onEdit,
+  donut,
+  legend = "right",
 }: {
   title: string
+  description?: string
   data: { name: string; value: number }[]
   loading?: boolean
   onEdit?: () => void
+  /** Render as a donut (hollow center) instead of a full pie. */
+  donut?: boolean
+  /** Where the legend sits relative to the chart. */
+  legend?: "right" | "bottom"
 }) {
+  const stacked = legend === "bottom"
   const total = data.reduce((a, d) => a + d.value, 0)
+
+  const empty = (
+    <div className="flex h-[200px] items-center justify-center text-sm text-text-muted">
+      No data
+    </div>
+  )
+
   return (
-    <PanelCard title={title} onEdit={onEdit} dialogClassName="sm:max-w-lg">
+    <PanelCard
+      title={title}
+      description={description}
+      onEdit={onEdit}
+      dialogClassName="sm:max-w-xl"
+      enlargedViews={
+        total > 0
+          ? [
+              {
+                key: "chart",
+                label: "Chart",
+                node: (
+                  <div className="flex justify-center py-4">
+                    <Donut
+                      data={data}
+                      total={total}
+                      donut={donut}
+                      legend="bottom"
+                      size={320}
+                    />
+                  </div>
+                ),
+              },
+            ]
+          : undefined
+      }
+    >
       {loading ? (
-        <Skeleton className="mx-auto aspect-square max-h-[220px] w-[220px]" />
+        <Skeleton className="mx-auto aspect-square max-h-[200px] w-[200px]" />
       ) : total === 0 ? (
-        <div className="flex h-[220px] items-center justify-center text-sm text-text-muted">
-          No data
-        </div>
+        empty
       ) : (
-        <div className="flex h-full items-center justify-between gap-6 pr-4">
-          <ChartContainer
-            config={{ value: { label: "Calls" } } satisfies ChartConfig}
-            className="aspect-square h-[200px]"
-          >
-            <PieChart>
-              <ChartTooltip cursor={false} content={<ChartTooltipContent hideLabel />} />
-              <Pie data={data} dataKey="value" nameKey="name" outerRadius={84} stroke="0">
-                {data.map((_, i) => (
-                  <Cell key={i} fill={PALETTE[i % PALETTE.length]} />
-                ))}
-              </Pie>
-            </PieChart>
-          </ChartContainer>
-          <ul className="shrink-0 space-y-1.5 text-xs">
-            {data.map((d, i) => (
-              <li key={d.name} className="flex items-center gap-2.5">
-                <span
-                  className="size-2.5 shrink-0 rounded-[2px]"
-                  style={{ background: PALETTE[i % PALETTE.length] }}
-                />
-                <span>{d.name}</span>
-                <span className="ml-2 tabular-nums text-text-muted">
-                  {Math.round((d.value / total) * 100)}%
-                </span>
-              </li>
-            ))}
-          </ul>
-        </div>
+        <Donut
+          data={data}
+          total={total}
+          donut={donut}
+          legend={legend}
+          size={stacked ? 172 : 188}
+        />
       )}
     </PanelCard>
   )

@@ -1,5 +1,6 @@
 import {
   BarChart3,
+  Grid3x3,
   Hash,
   PieChart,
   Table as TableIcon,
@@ -21,7 +22,11 @@ export const VIZ: { type: WidgetType; label: string; Icon: LucideIcon }[] = [
   { type: "bar", label: "Bar", Icon: BarChart3 },
   { type: "pie", label: "Pie", Icon: PieChart },
   { type: "table", label: "Table", Icon: TableIcon },
+  { type: "heatmap", label: "Heatmap", Icon: Grid3x3 },
 ]
+
+// Types that show a single metric (no group-by) in the builder.
+export const SCALAR_TYPES: WidgetType[] = ["number", "heatmap"]
 
 // Primary KPIs get hero treatment; the rest fill the secondary grid.
 export const HERO_WIDGET_IDS = ["w1", "w2"]
@@ -38,4 +43,4 @@ export const DEFAULT_WIDGETS: Widget[] = [
 ]
 
 export const SPAN_FOR_TYPE = (type: WidgetType): 1 | 2 =>
-  type === "line" || type === "table" ? 2 : 1
+  type === "line" || type === "table" || type === "heatmap" ? 2 : 1

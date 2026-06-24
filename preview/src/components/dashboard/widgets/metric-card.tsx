@@ -1,12 +1,19 @@
 "use client"
 
 import {
+  ArrowLeftRight,
   Clock,
   DollarSign,
   Hash,
+  ListChecks,
   Percent,
+  Phone,
+  PhoneCall,
+  PhoneIncoming,
+  PhoneOutgoing,
   Settings2,
   Sigma,
+  Voicemail,
   type LucideIcon,
 } from "lucide-react"
 
@@ -23,6 +30,20 @@ const FORMAT_ICON: Record<MetricFormat, LucideIcon> = {
   ratio: Sigma,
   duration: Clock,
   currency: DollarSign,
+}
+
+// Pick a meaningful icon from the metric label; fall back to the format icon
+// (so e.g. "Calls connected" shows a phone, not a generic "#").
+function iconForMetric(metric: Metric): LucideIcon {
+  const l = metric.label.toLowerCase()
+  if (/connect/.test(l)) return PhoneCall
+  if (/transfer/.test(l)) return ArrowLeftRight
+  if (/voicemail|missed/.test(l)) return Voicemail
+  if (/inbound|received/.test(l)) return PhoneIncoming
+  if (/outbound|attempt|dial/.test(l)) return PhoneOutgoing
+  if (/task/.test(l)) return ListChecks
+  if (/call/.test(l)) return Phone
+  return FORMAT_ICON[metric.format]
 }
 
 interface MetricCardProps {
@@ -68,12 +89,13 @@ function ReadyMetricCard({
   return (
     <WidgetShell title={widget.title} owner={widget.owner} {...ctl}>
       <StatBody
-        icon={FORMAT_ICON[metric.format]}
+        icon={iconForMetric(metric)}
         label={metric.label}
         value={formatValue(data.value, metric.format)}
         loading={loading}
         muted={!loading && data.value === 0}
         hero={hero}
+        row
       />
     </WidgetShell>
   )

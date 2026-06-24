@@ -2,6 +2,7 @@
 
 import type { Metric, TimeRange, Widget } from "@/lib/insights/types"
 import { BarWidget } from "./bar-widget"
+import { HeatmapWidget } from "./heatmap-widget"
 import { LineWidget } from "./line-widget"
 import { MetricCard } from "./metric-card"
 import { PieWidget } from "./pie-widget"
@@ -48,6 +49,8 @@ export function WidgetRenderer({
       return <PieWidget {...shared} />
     case "table":
       return <TableWidget {...shared} />
+    case "heatmap":
+      return <HeatmapWidget {...shared} />
     default:
       return null
   }

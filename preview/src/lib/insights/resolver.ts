@@ -184,6 +184,7 @@ export interface ConversationPoint {
   Outbound: number
   Web: number
   Tasks: number
+  [key: string]: string | number
 }
 
 // Multi-series daily buckets for the hero Conversations & Tasks chart.
@@ -412,4 +413,33 @@ export function formatValue(value: number | null, format: MetricFormat): string 
     default:
       return new Intl.NumberFormat("en-US").format(Math.round(value))
   }
+}
+
+// --- Calls heatmap -----------------------------------------------------------
+// Number of calls per day (rows) × time-of-day bucket (cols), from EVENTS.
+export interface HeatmapData {
+  cols: string[]
+  rows: { label: string; cells: number[] }[]
+  max: number
+}
+
+const HEATMAP_BUCKETS = [0, 4, 8, 12, 16, 20]
+const HEATMAP_COLS = ["12a", "4a", "8a", "12p", "4p", "8p"]
+
+export function resolveHeatmap(range: TimeRange): HeatmapData {
+  const span = RANGE_DAYS[range]
+  let max = 0
+  const rows: { label: string; cells: number[] }[] = []
+  for (let d = span - 1; d >= 0; d--) {
+    const dom = 22 - d
+    const label = `${String(dom).padStart(2, "0")}/06`
+    const dayEv = EVENTS.filter((e) => e.dayAgo === d)
+    const cells = HEATMAP_BUCKETS.map((b) => {
+      const n = dayEv.filter((e) => e.hour >= b && e.hour < b + 4).length
+      if (n > max) max = n
+      return n
+    })
+    rows.push({ label, cells })
+  }
+  return { cols: HEATMAP_COLS, rows, max }
 }
