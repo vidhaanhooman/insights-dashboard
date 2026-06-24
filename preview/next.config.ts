@@ -1,7 +1,12 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  async redirects() {
+    return [
+      // Land on the Overview dashboard.
+      { source: "/", destination: "/overview", permanent: false },
+    ];
+  },
 };
 
 export default nextConfig;
