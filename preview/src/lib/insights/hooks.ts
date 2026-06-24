@@ -22,6 +22,8 @@ import {
   resolvePickupByTime,
   resolveScalar,
   resolveSeries,
+  resolveVariantSeries,
+  resolveVariantStats,
   type AgentRow,
   type AttemptWiseRow,
   type ConversationPoint,
@@ -35,6 +37,8 @@ import {
   type NumberWiseRow,
   type OutboundSummary,
   type SeriesPoint,
+  type VariantSeriesPoint,
+  type VariantStats,
 } from "./resolver"
 import type { DataResult, Metric, TimeRange } from "./types"
 
@@ -241,6 +245,36 @@ export function usePickupByTime(
     () => resolvePickupByTime(range),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [range, refreshKey]
+  )
+  return { data, loading }
+}
+
+export function useVariantStats(
+  agent: string,
+  range: TimeRange,
+  refreshKey = 0
+): DataResult<VariantStats> {
+  const loading = useLoadingFor(`variant|${agent}|${range}|${refreshKey}`)
+  const data = React.useMemo(
+    () => resolveVariantStats(agent, range),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [agent, range, refreshKey]
+  )
+  return { data, loading }
+}
+
+export function useVariantSeries(
+  agents: string[],
+  range: TimeRange,
+  refreshKey = 0
+): DataResult<VariantSeriesPoint[]> {
+  const loading = useLoadingFor(
+    `variantseries|${agents.join(",")}|${range}|${refreshKey}`
+  )
+  const data = React.useMemo(
+    () => resolveVariantSeries(agents, range),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [agents.join(","), range, refreshKey]
   )
   return { data, loading }
 }

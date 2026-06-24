@@ -33,12 +33,11 @@ import type {
   WidgetType,
 } from "@/lib/insights/types"
 import { cn } from "@/lib/utils"
+import { FilterBuilder, type FilterRow } from "./filter-builder"
 
 const OWNER_ID = "you"
 const DATA_SOURCES = ["Conversations", "Calls", "Tasks"]
-const FILTER_FIELDS = ["type", "outcome", "agent", "status", "direction"]
-const OPERATORS = ["==", "!=", ">", "<", ">=", "<=", "contains"]
-const VALUE_TYPES = ["String", "Number", "Boolean"]
+const AGG_TYPES = ["Sum", "Average", "Count", "Min", "Max", "Unique count"]
 const GROUP_BY = [
   "None",
   "time",
@@ -66,16 +65,10 @@ type WidgetPatch = Pick<
 let _uid = 0
 const uid = (p: string) => `${p}${++_uid}`
 
-interface FilterRow {
-  id: string
-  field: string
-  op: string
-  type: string
-  value: string
-}
 interface MetricBlock {
   id: string
   metricId: string
+  agg: string
   name: string
   open: boolean
   filters: FilterRow[]
@@ -86,11 +79,8 @@ export interface BuilderTarget {
   metric?: Metric
 }
 
-function newFilter(): FilterRow {
-  return { id: uid("f"), field: "type", op: "==", type: "String", value: "" }
-}
 function newMetricBlock(metricId = ""): MetricBlock {
-  return { id: uid("m"), metricId, name: "", open: true, filters: [] }
+  return { id: uid("m"), metricId, agg: "Sum", name: "", open: true, filters: [] }
 }
 
 function initialBlocks(editing?: BuilderTarget | null): MetricBlock[] {
@@ -104,12 +94,11 @@ function initialBlocks(editing?: BuilderTarget | null): MetricBlock[] {
           id: uid("f"),
           field: w.field,
           op: "==",
-          type: "String",
           value: w.value,
         }))
       : []
   return [
-    { id: uid("m"), metricId: base ?? "", name: "", open: true, filters },
+    { id: uid("m"), metricId: base ?? "", agg: "Sum", name: "", open: true, filters },
   ]
 }
 
@@ -168,6 +157,8 @@ function BuilderForm({
   onClose: () => void
 }) {
   const isEdit = !!editing
+  // Metric (number) widgets get a focused, per-metric edit view — no chart chrome.
+  const metricMode = editing?.widget.type === "number"
   const [viz, setViz] = React.useState<WidgetType>(editing?.widget.type ?? "number")
   const [title, setTitle] = React.useState(editing?.widget.title ?? "")
   const [dataSource, setDataSource] = React.useState(
@@ -184,6 +175,13 @@ function BuilderForm({
   )
   const [viewBy, setViewBy] = React.useState<ViewByGranularity>(
     editing?.widget.config.viewBy ?? "Hour"
+  )
+  const [donut, setDonut] = React.useState(editing?.widget.config.donut ?? true)
+  const [percentages, setPercentages] = React.useState(
+    editing?.widget.config.percentages ?? true
+  )
+  const [showLegend, setShowLegend] = React.useState(
+    editing?.widget.config.showLegend ?? true
   )
   const [metrics, setMetrics] = React.useState<MetricBlock[]>(() =>
     initialBlocks(editing)
@@ -211,16 +209,6 @@ function BuilderForm({
   function patchBlock(id: string, patch: Partial<MetricBlock>) {
     setMetrics((m) => m.map((b) => (b.id === id ? { ...b, ...patch } : b)))
   }
-  function patchFilter(blockId: string, fid: string, patch: Partial<FilterRow>) {
-    setMetrics((m) =>
-      m.map((b) =>
-        b.id === blockId
-          ? { ...b, filters: b.filters.map((f) => (f.id === fid ? { ...f, ...patch } : f)) }
-          : b
-      )
-    )
-  }
-
   function submit() {
     if (!canSave) return
     const id = editing ? editing.widget.id : uid("c")
@@ -252,6 +240,12 @@ function BuilderForm({
       config.groupBy = groupBy
       if (groupBy === "time") config.viewBy = viewBy
     }
+    // Display options (pie).
+    if (viz === "pie") {
+      config.donut = donut
+      config.percentages = percentages
+      config.showLegend = showLegend
+    }
     const patch: WidgetPatch = {
       type: viz,
       title: title.trim(),
@@ -271,34 +265,43 @@ function BuilderForm({
   return (
     <>
       <DialogHeader className="shrink-0 border-b px-6 py-4">
-        <DialogTitle>{isEdit ? "Edit widget" : "Add widget"}</DialogTitle>
+        <DialogTitle>
+          {metricMode ? "Edit metric" : isEdit ? "Edit widget" : "Add widget"}
+        </DialogTitle>
         <p className="text-xs text-muted-foreground">
-          Configure how this metric is visualized
+          {metricMode
+            ? "Edit the metric, its name, and filters"
+            : "Configure how this metric is visualized"}
         </p>
       </DialogHeader>
 
       <div className="flex-1 space-y-6 overflow-y-auto px-6 py-5">
+        {!metricMode && (
         <div className="space-y-2">
           <SectionLabel>Visualization</SectionLabel>
-            <div className="grid grid-cols-5 gap-2">
-              {VIZ.map((v) => (
-                <button
-                  key={v.type}
-                  type="button"
-                  onClick={() => setViz(v.type)}
-                  className={cn(
-                    "flex flex-col items-center justify-center gap-1.5 rounded-lg border py-2.5 text-xs transition-colors",
-                    viz === v.type
-                      ? "border-destructive text-foreground"
-                      : "border-border text-muted-foreground hover:bg-accent"
-                  )}
-                >
-                  <v.Icon className="size-4" />
-                  {v.label}
-                </button>
-              ))}
+            <div className="grid grid-cols-3 gap-2 sm:grid-cols-6">
+              {VIZ.map((v) => {
+                const active = viz === v.type
+                return (
+                  <button
+                    key={v.type}
+                    type="button"
+                    onClick={() => setViz(v.type)}
+                    className={cn(
+                      "flex flex-col items-center justify-center gap-2 rounded-lg border py-3 text-xs font-medium transition-colors",
+                      active
+                        ? "border-ring bg-accent-dim text-text"
+                        : "border-border text-text-muted hover:border-border-strong hover:bg-surface-2/50 hover:text-text"
+                    )}
+                  >
+                    <v.Icon className={cn("size-4", active && "text-brand")} />
+                    {v.label}
+                  </button>
+                )
+              })}
             </div>
           </div>
+        )}
 
           <div className="space-y-3">
             <SectionLabel>Details</SectionLabel>
@@ -350,6 +353,24 @@ function BuilderForm({
               <Switch checked={persist} onCheckedChange={setPersist} />
             </div>
           </div>
+
+        {viz === "pie" && (
+          <div className="space-y-3">
+            <SectionLabel>Display</SectionLabel>
+            <div className="flex items-center justify-between">
+              <Label className="text-sm font-normal">Display as donut</Label>
+              <Switch checked={donut} onCheckedChange={setDonut} />
+            </div>
+            <div className="flex items-center justify-between">
+              <Label className="text-sm font-normal">Display as percentages</Label>
+              <Switch checked={percentages} onCheckedChange={setPercentages} />
+            </div>
+            <div className="flex items-center justify-between">
+              <Label className="text-sm font-normal">Show legend</Label>
+              <Switch checked={showLegend} onCheckedChange={setShowLegend} />
+            </div>
+          </div>
+        )}
 
         {!SCALAR_TYPES.includes(viz) && (
           <div className="space-y-3">
@@ -428,21 +449,48 @@ function BuilderForm({
 
                 {block.open && (
                   <div className="space-y-3">
-                    <Select
-                      value={block.metricId}
-                      onValueChange={(v) => patchBlock(block.id, { metricId: v })}
-                    >
-                      <SelectTrigger className="w-full">
-                        <SelectValue placeholder="Select metric" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {SYSTEM_METRICS.map((m) => (
-                          <SelectItem key={m.id} value={m.id}>
-                            {m.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <div className="flex gap-3">
+                      <div className="flex-1 space-y-1.5">
+                        <Label className="text-sm font-normal">Field</Label>
+                        <Select
+                          value={block.metricId}
+                          onValueChange={(v) =>
+                            patchBlock(block.id, { metricId: v })
+                          }
+                        >
+                          <SelectTrigger className="w-full">
+                            <SelectValue placeholder="Select field" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {SYSTEM_METRICS.map((m) => (
+                              <SelectItem key={m.id} value={m.id}>
+                                {m.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      {!SCALAR_TYPES.includes(viz) && (
+                        <div className="w-[140px] shrink-0 space-y-1.5">
+                          <Label className="text-sm font-normal">Type</Label>
+                          <Select
+                            value={block.agg}
+                            onValueChange={(v) => patchBlock(block.id, { agg: v })}
+                          >
+                            <SelectTrigger className="w-full">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {AGG_TYPES.map((a) => (
+                                <SelectItem key={a} value={a}>
+                                  {a}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      )}
+                    </div>
 
                     <div className="space-y-1.5">
                       <div>
@@ -468,76 +516,10 @@ function BuilderForm({
                       )}
                     </div>
 
-                    <div>
-                      <p className="mb-2 text-sm font-medium">Filters</p>
-                      <div className="space-y-2">
-                        {block.filters.map((f) => (
-                          <div
-                            key={f.id}
-                            className="grid grid-cols-[minmax(0,1fr)_104px_104px_minmax(0,1fr)_auto] items-center gap-1.5"
-                          >
-                            <MiniSelect
-                              value={f.field}
-                              options={FILTER_FIELDS}
-                              onChange={(v) =>
-                                patchFilter(block.id, f.id, { field: v })
-                              }
-                            />
-                            <MiniSelect
-                              value={f.op}
-                              options={OPERATORS}
-                              onChange={(v) =>
-                                patchFilter(block.id, f.id, { op: v })
-                              }
-                            />
-                            <MiniSelect
-                              value={f.type}
-                              options={VALUE_TYPES}
-                              onChange={(v) =>
-                                patchFilter(block.id, f.id, { type: v })
-                              }
-                            />
-                            <Input
-                              value={f.value}
-                              onChange={(e) =>
-                                patchFilter(block.id, f.id, {
-                                  value: e.target.value,
-                                })
-                              }
-                              placeholder="Value"
-                              className="h-9 min-w-0"
-                            />
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="size-9 shrink-0 text-muted-foreground"
-                              aria-label="Remove filter"
-                              onClick={() =>
-                                patchBlock(block.id, {
-                                  filters: block.filters.filter(
-                                    (x) => x.id !== f.id
-                                  ),
-                                })
-                              }
-                            >
-                              <Trash2 className="size-4" />
-                            </Button>
-                          </div>
-                        ))}
-                      </div>
-                      <Button
-                        variant="secondary"
-                        size="sm"
-                        className="mt-2"
-                        onClick={() =>
-                          patchBlock(block.id, {
-                            filters: [...block.filters, newFilter()],
-                          })
-                        }
-                      >
-                        <Plus /> Add filter
-                      </Button>
-                    </div>
+                    <FilterBuilder
+                      filters={block.filters}
+                      onChange={(f) => patchBlock(block.id, { filters: f })}
+                    />
                   </div>
                 )}
                 </CardContent>
@@ -567,29 +549,3 @@ function BuilderForm({
   )
 }
 
-function MiniSelect({
-  value,
-  options,
-  onChange,
-  className,
-}: {
-  value: string
-  options: string[]
-  onChange: (v: string) => void
-  className?: string
-}) {
-  return (
-    <Select value={value} onValueChange={onChange}>
-      <SelectTrigger className={cn("h-9 w-full min-w-0", className)}>
-        <SelectValue />
-      </SelectTrigger>
-      <SelectContent>
-        {options.map((o) => (
-          <SelectItem key={o} value={o}>
-            {o}
-          </SelectItem>
-        ))}
-      </SelectContent>
-    </Select>
-  )
-}

@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { Bar, BarChart, Cell, Pie, PieChart } from "recharts"
+import { Bar, BarChart, Cell, LabelList, Pie, PieChart } from "recharts"
 import { CartesianGrid, Line, LineChart, XAxis, YAxis } from "recharts"
 import {
   Bell,
@@ -17,6 +17,8 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import {
   ChartContainer,
+  ChartLegend,
+  ChartLegendContent,
   ChartTooltip,
   ChartTooltipContent,
   type ChartConfig,
@@ -42,7 +44,17 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { Skeleton } from "@/components/ui/skeleton"
+import { useGrouped } from "@/lib/insights/hooks"
 import { ChartToolbar } from "@/components/dashboard/chart-toolbar"
+import { FilterBuilder, type FilterRow } from "@/components/dashboard/filter-builder"
+import {
+  ChartDetail,
+  RailColors,
+  RailCombo,
+  RailGroup,
+  RailToggle,
+  useChartColors,
+} from "@/components/dashboard/chart-edit"
 import { SegmentedToggle } from "@/components/dashboard/segmented-toggle"
 import { MetricBreakdown } from "@/components/dashboard/widgets/metric-breakdown"
 import { MetricDetail } from "@/components/dashboard/widgets/metric-detail"
@@ -57,6 +69,9 @@ const PALETTE = [
   "var(--chart-4)",
   "var(--chart-5)",
 ]
+
+// Hex equivalents of the chart palette — needed for the native color picker.
+const PIE_HEX = ["#3a6ae6", "#6f9cf6", "#2546b3", "#a9caff", "#5f79c9"]
 
 export interface Stat {
   label: string
@@ -142,6 +157,7 @@ export function PanelCard({
   className,
   children,
   enlargedViews,
+  enlargeContent,
   onEdit,
   dialogClassName = "sm:max-w-4xl",
 }: {
@@ -152,6 +168,8 @@ export function PanelCard({
   children: React.ReactNode
   /** Optional alternate views shown (with a toggle) in the enlarge dialog. */
   enlargedViews?: EnlargedView[]
+  /** Full custom body for the enlarge dialog (replaces the toolbar + chart). */
+  enlargeContent?: React.ReactNode
   /** Opens the widget builder to configure this panel. */
   onEdit?: () => void
   /** Width of the enlarge dialog. */
@@ -209,11 +227,11 @@ export function PanelCard({
                 <DropdownMenuItem onSelect={() => setNonce((n) => n + 1)}>
                   <RefreshCw /> Refresh
                 </DropdownMenuItem>
-                <DropdownMenuItem
-                  onSelect={() => (onEdit ? onEdit() : setOpen(true))}
-                >
-                  <SlidersHorizontal /> Edit…
-                </DropdownMenuItem>
+                {onEdit && (
+                  <DropdownMenuItem onSelect={onEdit}>
+                    <SlidersHorizontal /> Edit…
+                  </DropdownMenuItem>
+                )}
                 {/* TODO(stub): wire up image export */}
                 <DropdownMenuItem disabled>
                   <Download /> Download image
@@ -236,7 +254,7 @@ export function PanelCard({
           <DialogHeader>
             <div className="flex items-center justify-between gap-4">
               <DialogTitle>{title}</DialogTitle>
-              {enlargedViews && enlargedViews.length > 1 && (
+              {!enlargeContent && enlargedViews && enlargedViews.length > 1 && (
                 <SegmentedToggle
                   size="sm"
                   value={activeView?.key ?? ""}
@@ -249,8 +267,14 @@ export function PanelCard({
               )}
             </div>
           </DialogHeader>
-          <ChartToolbar />
-          {activeView ? activeView.node : children}
+          {enlargeContent ? (
+            <div className="min-h-0 flex-1 overflow-hidden">{enlargeContent}</div>
+          ) : (
+            <>
+              <ChartToolbar />
+              {activeView ? activeView.node : children}
+            </>
+          )}
         </DialogContent>
       </Dialog>
     </>
@@ -270,6 +294,7 @@ export function LinePanel({
   series,
   loading,
   onEdit,
+  fill,
 }: {
   title: string
   description?: string
@@ -277,6 +302,8 @@ export function LinePanel({
   series: LineSeries[]
   loading?: boolean
   onEdit?: () => void
+  /** Stretch the chart to fill the card height (for tall, height-matched rows). */
+  fill?: boolean
 }) {
   const config = Object.fromEntries(
     series.map((s) => [s.key, { label: s.label, color: s.color }])
@@ -295,12 +322,42 @@ export function LinePanel({
   }
 
   return (
-    <PanelCard title={title} description={description} onEdit={onEdit}>
+    <PanelCard
+      title={title}
+      description={description}
+      onEdit={onEdit}
+      dialogClassName="flex h-[90vh] w-[94vw] max-w-[94vw] flex-col sm:max-w-[94vw]"
+      enlargeContent={
+        loading ? undefined : <LineDetail data={data} series={series} />
+      }
+    >
       {loading ? (
-        <Skeleton className="h-[260px] w-full" />
+        <Skeleton className={cn("w-full", fill ? "h-full min-h-[240px]" : "h-[260px]")} />
       ) : (
-        <>
-          <ChartContainer config={config} className="h-[260px] w-full">
+        <div className="flex h-full flex-col">
+          {/* Legend up top (dots under the title) — click to isolate a series. */}
+          <div className="mb-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
+            {series.map((s) => (
+              <button
+                key={s.key}
+                onClick={() => isolate(s.key)}
+                className={cn(
+                  "flex items-center gap-1.5 rounded-md py-0.5 transition-opacity hover:opacity-80",
+                  visible.has(s.key) ? "text-text-muted" : "opacity-40"
+                )}
+              >
+                <span className="size-2 rounded-full" style={{ background: s.color }} />
+                {s.label}
+              </button>
+            ))}
+          </div>
+          <ChartContainer
+            config={config}
+            className={cn(
+              "w-full",
+              fill ? "aspect-auto min-h-0 flex-1" : "h-[240px]"
+            )}
+          >
             <LineChart data={data} margin={{ top: 8, right: 12, left: -12 }}>
               <CartesianGrid vertical={false} strokeDasharray="3 3" />
               <XAxis
@@ -308,7 +365,7 @@ export function LinePanel({
                 tickLine={false}
                 axisLine={false}
                 tickMargin={10}
-                minTickGap={24}
+                interval={0}
               />
               <YAxis tickLine={false} axisLine={false} width={32} allowDecimals={false} />
               <ChartTooltip content={<ChartTooltipContent />} />
@@ -326,22 +383,7 @@ export function LinePanel({
                 ))}
             </LineChart>
           </ChartContainer>
-          <div className="mt-2 flex justify-center gap-2 text-xs">
-            {series.map((s) => (
-              <button
-                key={s.key}
-                onClick={() => isolate(s.key)}
-                className={cn(
-                  "flex items-center gap-1.5 rounded-md px-1.5 py-0.5 transition-opacity hover:bg-surface-2",
-                  visible.has(s.key) ? "text-text-muted" : "opacity-40"
-                )}
-              >
-                <span className="size-2 rounded-full" style={{ background: s.color }} />
-                {s.label}
-              </button>
-            ))}
-          </div>
-        </>
+        </div>
       )}
     </PanelCard>
   )
@@ -367,8 +409,6 @@ function Donut({
 }) {
   const [active, setActive] = React.useState<number | null>(null)
   const stacked = legend === "bottom"
-  const outer = size / 2 - 6
-  const inner = donut ? Math.round(outer * 0.62) : 0
 
   return (
     <div
@@ -381,8 +421,9 @@ function Donut({
     >
       <ChartContainer
         config={{ value: { label: "Calls" } } satisfies ChartConfig}
-        className="shrink-0"
-        style={{ height: size, width: size }}
+        // Responsive square — fills the card up to `size` and stays 1:1.
+        className="mx-auto aspect-square w-full shrink-0"
+        style={{ maxWidth: size, maxHeight: size }}
       >
         <PieChart>
           <ChartTooltip cursor={false} content={<ChartTooltipContent hideLabel />} />
@@ -390,8 +431,8 @@ function Donut({
             data={data}
             dataKey="value"
             nameKey="name"
-            outerRadius={outer}
-            innerRadius={inner}
+            outerRadius="92%"
+            innerRadius={donut ? "62%" : "0%"}
             stroke="0"
             onMouseEnter={(_, i) => setActive(i)}
             onMouseLeave={() => setActive(null)}
@@ -439,6 +480,326 @@ function Donut({
   )
 }
 
+const GROUP_OPTIONS = [
+  { value: "outcome", label: "Outcome" },
+  { value: "agent", label: "Agent" },
+  { value: "callInfo.endReason", label: "End reason" },
+  { value: "callInfo.from", label: "From" },
+  { value: "callInfo.to", label: "To" },
+  { value: "callInfo.attempt", label: "Attempt" },
+]
+
+// Expanded pie view — big labelled chart + editable rail (Display / Data /
+// Colors / Filters). Group by + Show actually re-query the chart.
+function PieDetail({
+  data,
+  donut: donutInit,
+  percentages: pctInit,
+  range,
+  refreshKey,
+  groupBy: groupByInit,
+}: {
+  data: { name: string; value: number }[]
+  donut?: boolean
+  percentages?: boolean
+  range?: TimeRange
+  refreshKey?: number
+  groupBy?: string
+}) {
+  const fieldByLabel = React.useMemo(
+    () => Object.fromEntries(GROUP_OPTIONS.map((o) => [o.label, o.value])),
+    []
+  )
+  const labelByField = React.useMemo(
+    () => Object.fromEntries(GROUP_OPTIONS.map((o) => [o.value, o.label])),
+    []
+  )
+  const [donut, setDonut] = React.useState(donutInit ?? true)
+  const [percentages, setPercentages] = React.useState(pctInit ?? true)
+  const [showLegend, setShowLegend] = React.useState(false)
+  const [measure, setMeasure] = React.useState("Calls")
+  const [groupLabel, setGroupLabel] = React.useState(
+    labelByField[groupByInit ?? "outcome"] ?? "Outcome"
+  )
+  const [show, setShow] = React.useState("All")
+  const [showUngrouped, setShowUngrouped] = React.useState(false)
+  const [filters, setFilters] = React.useState<FilterRow[]>([])
+  const { colorFor, pick } = useChartColors(PIE_HEX)
+  const [active, setActive] = React.useState<number | null>(null)
+
+  const groupField = fieldByLabel[groupLabel] ?? "outcome"
+  const live = useGrouped(groupField, range ?? "today", refreshKey ?? 0)
+  const base = range ? live.data : data
+  const chartData =
+    show === "All" ? base : base.slice(0, show === "Top 5" ? 5 : 8)
+
+  const RAD = Math.PI / 180
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const renderLabel = (p: any) => {
+    const r = p.outerRadius + 16
+    const x = p.cx + r * Math.cos(-p.midAngle * RAD)
+    const y = p.cy + r * Math.sin(-p.midAngle * RAD)
+    const txt = percentages
+      ? `${p.name} ${Math.round(p.percent * 100)}%`
+      : `${p.name} ${p.value}`
+    return (
+      <text
+        x={x}
+        y={y}
+        textAnchor={x > p.cx ? "start" : "end"}
+        dominantBaseline="central"
+        fill="var(--text-dim)"
+        fontSize={11}
+      >
+        {txt}
+      </text>
+    )
+  }
+
+  const chart = (
+    <>
+      <ChartContainer
+        config={{ value: { label: measure } } satisfies ChartConfig}
+        className="mx-auto aspect-square h-full max-h-[640px] w-auto"
+      >
+        <PieChart>
+          <ChartTooltip cursor={false} content={<ChartTooltipContent hideLabel />} />
+          <Pie
+            data={chartData}
+            dataKey="value"
+            nameKey="name"
+            outerRadius="66%"
+            innerRadius={donut ? "40%" : "0%"}
+            stroke="0"
+            label={renderLabel}
+            labelLine={{ stroke: "var(--border-strong)" }}
+            onMouseEnter={(_, i) => setActive(i)}
+            onMouseLeave={() => setActive(null)}
+          >
+            {chartData.map((_, i) => (
+              <Cell
+                key={i}
+                fill={colorFor(i)}
+                opacity={active === null || active === i ? 1 : 0.4}
+              />
+            ))}
+          </Pie>
+        </PieChart>
+      </ChartContainer>
+      {showLegend && (
+        <ul className="mt-2 flex flex-wrap justify-center gap-x-4 gap-y-1 text-xs">
+          {chartData.map((d, i) => (
+            <li key={d.name} className="flex items-center gap-1.5 text-text-muted">
+              <span
+                className="size-2 rounded-full"
+                style={{ background: colorFor(i) }}
+              />
+              {d.name}
+            </li>
+          ))}
+        </ul>
+      )}
+    </>
+  )
+
+  return (
+    <ChartDetail chart={chart}>
+      <RailGroup label="Display">
+        <RailToggle label="Display as donut" checked={donut} onChange={setDonut} />
+        <RailToggle
+          label="Display as percentages"
+          checked={percentages}
+          onChange={setPercentages}
+        />
+        <RailToggle label="Show legend" checked={showLegend} onChange={setShowLegend} />
+      </RailGroup>
+
+      <RailGroup label="Data">
+        <RailCombo
+          label="Measure"
+          value={measure}
+          onChange={setMeasure}
+          items={["Calls", "Connected"]}
+        />
+        <RailCombo
+          label="Group by"
+          value={groupLabel}
+          onChange={setGroupLabel}
+          items={GROUP_OPTIONS.map((o) => o.label)}
+        />
+        <RailCombo
+          label="Show"
+          value={show}
+          onChange={setShow}
+          items={["All", "Top 5", "Top 8"]}
+        />
+        <RailToggle
+          label="Show ungrouped"
+          checked={showUngrouped}
+          onChange={setShowUngrouped}
+        />
+      </RailGroup>
+
+      <RailGroup label="Colors">
+        <RailColors
+          names={chartData.map((d) => d.name)}
+          colorFor={colorFor}
+          onPick={pick}
+        />
+      </RailGroup>
+
+      <FilterBuilder filters={filters} onChange={setFilters} />
+    </ChartDetail>
+  )
+}
+
+// Expanded line view — multi-series line + Display / Data / Colors / Filters.
+function LineDetail({
+  data,
+  series,
+}: {
+  data: Record<string, string | number>[]
+  series: LineSeries[]
+}) {
+  const [showLegend, setShowLegend] = React.useState(true)
+  const [curve, setCurve] = React.useState("Smooth")
+  const [dots, setDots] = React.useState(false)
+  const [filters, setFilters] = React.useState<FilterRow[]>([])
+  const seriesHex = series.map((s) => s.color)
+  const { colorFor, pick } = useChartColors(seriesHex)
+  const config = Object.fromEntries(
+    series.map((s, i) => [s.key, { label: s.label, color: colorFor(i) }])
+  ) satisfies ChartConfig
+
+  const chart = (
+    <ChartContainer config={config} className="h-full max-h-[640px] w-full">
+      <LineChart data={data} margin={{ top: 12, right: 16, left: 0 }}>
+        <CartesianGrid vertical={false} strokeDasharray="3 3" />
+        <XAxis dataKey="label" tickLine={false} axisLine={false} tickMargin={10} interval={0} />
+        <YAxis tickLine={false} axisLine={false} width={36} allowDecimals={false} />
+        <ChartTooltip content={<ChartTooltipContent />} />
+        {showLegend && <ChartLegend content={<ChartLegendContent />} />}
+        {series.map((s, i) => (
+          <Line
+            key={s.key}
+            dataKey={s.key}
+            type={curve === "Smooth" ? "monotone" : "linear"}
+            stroke={colorFor(i)}
+            strokeWidth={2}
+            dot={dots}
+          />
+        ))}
+      </LineChart>
+    </ChartContainer>
+  )
+
+  return (
+    <ChartDetail chart={chart}>
+      <RailGroup label="Display">
+        <RailToggle label="Show legend" checked={showLegend} onChange={setShowLegend} />
+        <RailToggle label="Show points" checked={dots} onChange={setDots} />
+        <RailCombo
+          label="Curve"
+          value={curve}
+          onChange={setCurve}
+          items={["Smooth", "Straight"]}
+        />
+      </RailGroup>
+      <RailGroup label="Colors">
+        <RailColors
+          names={series.map((s) => s.label)}
+          colorFor={colorFor}
+          onPick={pick}
+        />
+      </RailGroup>
+      <FilterBuilder filters={filters} onChange={setFilters} />
+    </ChartDetail>
+  )
+}
+
+// Expanded bar view — bars + Display / Data / Colors / Filters.
+export function BarDetail({
+  data,
+}: {
+  data: { name: string; value: number }[]
+}) {
+  const [horizontal, setHorizontal] = React.useState(false)
+  const [showValues, setShowValues] = React.useState(false)
+  const [sort, setSort] = React.useState("Descending")
+  const [filters, setFilters] = React.useState<FilterRow[]>([])
+  const { colorFor, pick } = useChartColors(PIE_HEX)
+
+  const rows = React.useMemo(() => {
+    if (sort === "Default") return data
+    const copy = [...data]
+    copy.sort((a, b) => (sort === "Ascending" ? a.value - b.value : b.value - a.value))
+    return copy
+  }, [data, sort])
+
+  const chart = (
+    <ChartContainer
+      config={{ value: { label: "Value", color: "var(--chart-1)" } } satisfies ChartConfig}
+      className="h-full max-h-[640px] w-full"
+    >
+      <BarChart
+        data={rows}
+        layout={horizontal ? "vertical" : "horizontal"}
+        margin={{ top: 12, right: 24, left: horizontal ? 8 : 0, bottom: 4 }}
+        barCategoryGap="22%"
+      >
+        <CartesianGrid vertical={horizontal} horizontal={!horizontal} />
+        {horizontal ? (
+          <>
+            <XAxis type="number" tickLine={false} axisLine={false} />
+            <YAxis type="category" dataKey="name" tickLine={false} axisLine={false} width={96} />
+          </>
+        ) : (
+          <>
+            <XAxis dataKey="name" tickLine={false} axisLine={false} tickMargin={8} />
+            <YAxis tickLine={false} axisLine={false} width={36} allowDecimals={false} />
+          </>
+        )}
+        <ChartTooltip cursor={false} content={<ChartTooltipContent hideLabel />} />
+        <Bar dataKey="value" radius={4} maxBarSize={48}>
+          {rows.map((_, i) => (
+            <Cell key={i} fill={colorFor(i)} />
+          ))}
+          {showValues && (
+            <LabelList
+              dataKey="value"
+              position={horizontal ? "right" : "top"}
+              className="fill-text-dim text-[11px]"
+            />
+          )}
+        </Bar>
+      </BarChart>
+    </ChartContainer>
+  )
+
+  return (
+    <ChartDetail chart={chart}>
+      <RailGroup label="Display">
+        <RailToggle label="Horizontal bars" checked={horizontal} onChange={setHorizontal} />
+        <RailToggle label="Show values" checked={showValues} onChange={setShowValues} />
+        <RailCombo
+          label="Sort"
+          value={sort}
+          onChange={setSort}
+          items={["Descending", "Ascending", "Default"]}
+        />
+      </RailGroup>
+      <RailGroup label="Colors">
+        <RailColors
+          names={rows.map((d) => d.name)}
+          colorFor={colorFor}
+          onPick={pick}
+        />
+      </RailGroup>
+      <FilterBuilder filters={filters} onChange={setFilters} />
+    </ChartDetail>
+  )
+}
+
 export function PiePanel({
   title,
   description,
@@ -447,6 +808,10 @@ export function PiePanel({
   onEdit,
   donut,
   legend = "right",
+  square,
+  range,
+  refreshKey,
+  groupBy,
 }: {
   title: string
   description?: string
@@ -457,6 +822,12 @@ export function PiePanel({
   donut?: boolean
   /** Where the legend sits relative to the chart. */
   legend?: "right" | "bottom"
+  /** Constrain the card to a square box (chart stays compact). */
+  square?: boolean
+  /** Pass these so the enlarge view's "Group by" can re-query live. */
+  range?: TimeRange
+  refreshKey?: number
+  groupBy?: string
 }) {
   const stacked = legend === "bottom"
   const total = data.reduce((a, d) => a + d.value, 0)
@@ -472,27 +843,18 @@ export function PiePanel({
       title={title}
       description={description}
       onEdit={onEdit}
-      dialogClassName="sm:max-w-xl"
-      enlargedViews={
-        total > 0
-          ? [
-              {
-                key: "chart",
-                label: "Chart",
-                node: (
-                  <div className="flex justify-center py-4">
-                    <Donut
-                      data={data}
-                      total={total}
-                      donut={donut}
-                      legend="bottom"
-                      size={320}
-                    />
-                  </div>
-                ),
-              },
-            ]
-          : undefined
+      className={square ? "aspect-square w-full" : undefined}
+      dialogClassName="flex h-[90vh] w-[94vw] max-w-[94vw] flex-col sm:max-w-[94vw]"
+      enlargeContent={
+        total > 0 ? (
+          <PieDetail
+            data={data}
+            donut={donut}
+            range={range}
+            refreshKey={refreshKey}
+            groupBy={groupBy}
+          />
+        ) : undefined
       }
     >
       {loading ? (
@@ -505,7 +867,7 @@ export function PiePanel({
           total={total}
           donut={donut}
           legend={legend}
-          size={stacked ? 172 : 188}
+          size={stacked ? 180 : 188}
         />
       )}
     </PanelCard>

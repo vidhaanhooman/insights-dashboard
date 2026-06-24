@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from "react"
+import { Bar, BarChart, CartesianGrid, Cell, XAxis, YAxis } from "recharts"
 import {
   Download,
   Info,
@@ -10,6 +11,12 @@ import {
 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
+import {
+  ChartContainer,
+  ChartTooltip,
+  ChartTooltipContent,
+  type ChartConfig,
+} from "@/components/ui/chart"
 import {
   Dialog,
   DialogContent,
@@ -26,7 +33,10 @@ import { DateRangePicker } from "@/components/date-range-picker"
 import { SYSTEM_METRICS } from "@/lib/insights/registry"
 import {
   useConversations,
+  useGrouped,
   useKpiSummary,
+  usePickupByTime,
+  useSeries,
 } from "@/lib/insights/hooks"
 import { formatValue } from "@/lib/insights/resolver"
 import type { Metric, TimeRange, Widget } from "@/lib/insights/types"
@@ -34,12 +44,20 @@ import { cn } from "@/lib/utils"
 import { AgentPicker } from "./agent-picker"
 import { AppSidebar } from "./app-sidebar"
 import { ChartToolbar } from "./chart-toolbar"
-import { SegmentedToggle } from "./segmented-toggle"
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { WidgetBuilder } from "./widget-builder"
 import { WidgetBoard, defaultLayout, type BoardLayout } from "./widget-board"
-import { LinePanel, PiePanel } from "./views/panels"
+import { BarDetail, LinePanel, PanelCard, PiePanel } from "./views/panels"
 import { MetricBreakdown } from "./widgets/metric-breakdown"
 import { WidgetRenderer } from "./widgets/widget-renderer"
+
+const PALETTE = [
+  "var(--chart-1)",
+  "var(--chart-2)",
+  "var(--chart-3)",
+  "var(--chart-4)",
+  "var(--chart-5)",
+]
 
 const TABS = ["Overview", "Outbound", "Inbound", "Tasks", "Tools"] as const
 
@@ -49,7 +67,6 @@ const CONVO_SERIES = [
   { key: "Web", label: "Web", color: "#2546b3" },
   { key: "Tasks", label: "Tasks created", color: "#a9caff" },
 ]
-const CHANNELS = ["Inbound", "Outbound", "Web"] as const
 
 interface StatCard {
   label: string
@@ -75,7 +92,7 @@ function StatCards({
 
   if (loading) {
     return (
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid grid-cols-2 gap-4 self-start">
         {Array.from({ length: 4 }).map((_, i) => (
           <Skeleton key={i} className="h-[92px] w-full rounded-xl" />
         ))}
@@ -136,14 +153,14 @@ function StatCards({
   ]
 
   return (
-    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+    <div className="grid h-full grid-cols-2 grid-rows-2 gap-4">
       {cards.map((c) => (
         <Popover key={c.label}>
           <PopoverTrigger asChild>
             <button
               type="button"
               className={cn(
-                "group flex items-center justify-between gap-3 rounded-xl border px-4 py-4 text-left transition-colors",
+                "group flex h-full flex-col justify-between gap-3 rounded-xl border px-4 py-4 text-left transition-colors",
                 c.highlight
                   ? "border-[#3a6ae6]/45 bg-[#3a6ae6]/10 hover:bg-[#3a6ae6]/15"
                   : "border-border bg-card hover:border-border-strong hover:bg-surface-2/40"
@@ -165,7 +182,7 @@ function StatCards({
               </div>
               <p
                 className={cn(
-                  "text-2xl font-semibold tracking-tight tabular-nums",
+                  "text-3xl font-semibold tracking-tight tabular-nums",
                   c.highlight ? "text-[#cfe0ff]" : "text-text"
                 )}
               >
@@ -209,20 +226,46 @@ function ConversationsPanel({
 }) {
   const { data, loading } = useConversations(range, refreshKey)
   return (
-    <div className="lg:col-span-2">
-      <LinePanel
-        title="Conversations & Tasks"
-        description="Daily volume across channels for the selected range"
-        loading={loading}
-        data={data}
-        series={CONVO_SERIES}
-        onEdit={onEdit}
-      />
-    </div>
+    <LinePanel
+      title="Conversations & Tasks"
+      description="Daily volume across channels for the selected range"
+      loading={loading}
+      data={data}
+      series={CONVO_SERIES}
+      onEdit={onEdit}
+    />
   )
 }
 
-function ChannelPanel({
+function CallsPanel({
+  range,
+  refreshKey,
+  onEdit,
+  fill,
+}: {
+  range: TimeRange
+  refreshKey: number
+  onEdit?: () => void
+  fill?: boolean
+}) {
+  const { data, loading } = useSeries(range, refreshKey)
+  return (
+    <LinePanel
+      title="Calls attempted & connected"
+      description="Attempts vs. connections over time"
+      loading={loading}
+      data={data}
+      series={[
+        { key: "Attempted", label: "Attempted", color: "var(--chart-1)" },
+        { key: "Connected", label: "Connected", color: "var(--chart-2)" },
+      ]}
+      onEdit={onEdit}
+      fill={fill}
+    />
+  )
+}
+
+function OutcomePanel({
   range,
   refreshKey,
   onEdit,
@@ -231,24 +274,88 @@ function ChannelPanel({
   refreshKey: number
   onEdit?: () => void
 }) {
-  const { data, loading } = useConversations(range, refreshKey)
-  const slices = React.useMemo(
-    () =>
-      CHANNELS.map((name) => ({
-        name,
-        value: data.reduce((s, d) => s + (d[name] as number), 0),
-      })),
-    [data]
-  )
+  const { data, loading } = useGrouped("outcome", range, refreshKey)
   return (
     <PiePanel
-      title="Conversations by channel"
-      description="Share of conversations by channel"
+      title="Outcome breakdown"
+      description="Share of calls by outcome"
       loading={loading}
-      data={slices}
+      data={data}
       onEdit={onEdit}
       donut
       legend="bottom"
+      square
+      range={range}
+      refreshKey={refreshKey}
+      groupBy="outcome"
+    />
+  )
+}
+
+function AgentBarPanel({
+  range,
+  refreshKey,
+  onEdit,
+}: {
+  range: TimeRange
+  refreshKey: number
+  onEdit?: () => void
+}) {
+  const { data, loading } = useGrouped("agent", range, refreshKey)
+  const config = {
+    value: { label: "Calls", color: "var(--chart-1)" },
+  } satisfies ChartConfig
+  return (
+    <PanelCard
+      title="Calls by agent"
+      onEdit={onEdit}
+      className="aspect-square w-full"
+      dialogClassName="flex h-[90vh] w-[94vw] max-w-[94vw] flex-col sm:max-w-[94vw]"
+      enlargeContent={loading ? undefined : <BarDetail data={data} />}
+    >
+      {loading ? (
+        <Skeleton className="h-full min-h-[240px] w-full" />
+      ) : (
+        <ChartContainer config={config} className="h-full min-h-[240px] w-full">
+          <BarChart
+            data={data}
+            margin={{ top: 8, right: 12, left: -12 }}
+            barCategoryGap="28%"
+          >
+            <CartesianGrid vertical={false} />
+            <XAxis dataKey="name" tickLine={false} axisLine={false} tickMargin={8} />
+            <YAxis tickLine={false} axisLine={false} width={32} allowDecimals={false} />
+            <ChartTooltip cursor={false} content={<ChartTooltipContent hideLabel />} />
+            <Bar dataKey="value" radius={[4, 4, 0, 0]} maxBarSize={36}>
+              {data.map((_, i) => (
+                <Cell key={i} fill={PALETTE[i % PALETTE.length]} />
+              ))}
+            </Bar>
+          </BarChart>
+        </ChartContainer>
+      )}
+    </PanelCard>
+  )
+}
+
+function PickupPanel({
+  range,
+  refreshKey,
+  onEdit,
+}: {
+  range: TimeRange
+  refreshKey: number
+  onEdit?: () => void
+}) {
+  const { data, loading } = usePickupByTime(range, refreshKey)
+  return (
+    <LinePanel
+      title="Pickup rate over time"
+      description="Connected share by hour of day"
+      loading={loading}
+      data={data}
+      series={[{ key: "value", label: "Pickup rate", color: "var(--chart-1)" }]}
+      onEdit={onEdit}
     />
   )
 }
@@ -370,25 +477,33 @@ export function OverviewPage() {
       <AppSidebar />
 
       <main className="flex min-w-0 flex-1 flex-col">
-        <header className="flex flex-wrap items-center gap-x-6 gap-y-3 border-b px-5 py-3.5">
-          <span className="text-[15px] font-semibold">Insights</span>
-          <SegmentedToggle
-            options={TABS.map((t) => ({ value: t, label: t }))}
-            value={tab}
-            onChange={setTab}
-          />
-          <div className="ml-auto flex gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setRefreshKey((k) => k + 1)}
-            >
-              <RefreshCw /> Refresh
-            </Button>
-            <Button size="sm" onClick={openBuilder}>
-              <Plus /> Add widget
-            </Button>
+        <header className="flex flex-col gap-3 border-b px-5 pt-3.5">
+          <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
+            <span className="text-[15px] font-semibold">Insights</span>
+            <div className="ml-auto flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setRefreshKey((k) => k + 1)}
+              >
+                <RefreshCw /> Refresh
+              </Button>
+              <Button size="sm" onClick={openBuilder}>
+                <Plus /> Add widget
+              </Button>
+            </div>
           </div>
+          <Tabs value={tab} onValueChange={setTab}>
+            {/* -ml offsets the list/trigger padding so the first tab lines up
+                with "Insights"; -mb-px seats the active underline on the border. */}
+            <TabsList variant="line" className="-mb-px -ml-[10px]">
+              {TABS.map((t) => (
+                <TabsTrigger key={t} value={t}>
+                  {t}
+                </TabsTrigger>
+              ))}
+            </TabsList>
+          </Tabs>
         </header>
 
         <div className="overflow-x-hidden px-7 py-6">
@@ -410,23 +525,24 @@ export function OverviewPage() {
             </div>
           </div>
 
-          {/* Stat cards */}
-          <div className="mt-4">
+          {/* Stats block + hero line */}
+          <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
             <StatCards range={range} refreshKey={refreshKey} />
+            <ConversationsPanel range={range} refreshKey={refreshKey} />
           </div>
 
-          {/* Charts */}
-          <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-3">
-            <ConversationsPanel
-              range={range}
-              refreshKey={refreshKey}
-              onEdit={openBuilder}
-            />
-            <ChannelPanel
-              range={range}
-              refreshKey={refreshKey}
-              onEdit={openBuilder}
-            />
+          {/* Calls attempted (left, fills) with the two square panels stacked on its right */}
+          <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
+            <CallsPanel range={range} refreshKey={refreshKey} fill />
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <OutcomePanel range={range} refreshKey={refreshKey} />
+              <AgentBarPanel range={range} refreshKey={refreshKey} />
+            </div>
+          </div>
+
+          {/* Pickup rate — full width below */}
+          <div className="mt-4">
+            <PickupPanel range={range} refreshKey={refreshKey} />
           </div>
 
           {/* Widget board — drag to reorder, drag the corner to resize. */}

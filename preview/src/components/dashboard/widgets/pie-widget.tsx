@@ -40,6 +40,10 @@ export function PieWidget({
   const field = widget.config.groupBy ?? "outcome"
   const { data, loading } = useGrouped(field, range, refreshKey)
   const total = data.reduce((a, d) => a + d.value, 0)
+  // Display options from the builder (default on).
+  const donut = widget.config.donut ?? true
+  const percentages = widget.config.percentages ?? true
+  const showLegend = widget.config.showLegend ?? true
   // Hovering a slice or its legend row highlights that segment and dims the rest.
   const [active, setActive] = React.useState<number | null>(null)
 
@@ -60,6 +64,7 @@ export function PieWidget({
                 dataKey="value"
                 nameKey="name"
                 outerRadius={78}
+                innerRadius={donut ? 48 : 0}
                 stroke="0"
                 onMouseEnter={(_, i) => setActive(i)}
                 onMouseLeave={() => setActive(null)}
@@ -74,28 +79,32 @@ export function PieWidget({
               </Pie>
             </PieChart>
           </ChartContainer>
-          <ul className="flex-1 space-y-1.5 text-xs">
-            {data.map((d, i) => (
-              <li
-                key={d.name}
-                onMouseEnter={() => setActive(i)}
-                onMouseLeave={() => setActive(null)}
-                className={cn(
-                  "flex cursor-default items-center gap-2 rounded px-1 py-0.5 transition-opacity",
-                  active !== null && active !== i && "opacity-40"
-                )}
-              >
-                <span
-                  className="size-2.5 shrink-0 rounded-[2px]"
-                  style={{ background: PALETTE[i % PALETTE.length] }}
-                />
-                <span className="truncate">{d.name}</span>
-                <span className="ml-auto tabular-nums text-muted-foreground">
-                  {total ? Math.round((d.value / total) * 100) : 0}%
-                </span>
-              </li>
-            ))}
-          </ul>
+          {showLegend && (
+            <ul className="flex-1 space-y-1.5 text-xs">
+              {data.map((d, i) => (
+                <li
+                  key={d.name}
+                  onMouseEnter={() => setActive(i)}
+                  onMouseLeave={() => setActive(null)}
+                  className={cn(
+                    "flex cursor-default items-center gap-2 rounded px-1 py-0.5 transition-opacity",
+                    active !== null && active !== i && "opacity-40"
+                  )}
+                >
+                  <span
+                    className="size-2.5 shrink-0 rounded-[2px]"
+                    style={{ background: PALETTE[i % PALETTE.length] }}
+                  />
+                  <span className="truncate">{d.name}</span>
+                  <span className="ml-auto tabular-nums text-muted-foreground">
+                    {percentages
+                      ? `${total ? Math.round((d.value / total) * 100) : 0}%`
+                      : d.value}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
       )}
     </WidgetShell>

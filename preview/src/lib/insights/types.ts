@@ -35,6 +35,10 @@ export type ViewByGranularity = "Hour" | "Day" | "Month"
 export interface WidgetConfig {
   groupBy?: string
   viewBy?: ViewByGranularity
+  /** Display options (mainly for pie/line). */
+  donut?: boolean
+  percentages?: boolean
+  showLegend?: boolean
 }
 
 export interface Widget {

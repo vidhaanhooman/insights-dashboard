@@ -13,6 +13,16 @@ function inRange(e: CallEvent, range: TimeRange) {
   return e.dayAgo < RANGE_DAYS[range]
 }
 
+// Intra-day buckets so multi-day series read dense + spiky (not one flat point
+// per day). Only the first bucket of each day carries an x-axis label.
+const BUCKETS = [0, 4, 8, 12, 16, 20]
+const dayLabel = (dayAgo: number) => `Jun ${22 - dayAgo}`
+// Deterministic 0..1 noise so the mock stays stable across refreshes.
+const noise = (i: number) => {
+  const r = Math.sin(i * 12.9898) * 43758.5453
+  return r - Math.floor(r)
+}
+
 function matchFilter(e: CallEvent, where: FilterClause[] = []) {
   return where.every((f) => String(e[f.field]) === String(f.value))
 }
@@ -52,6 +62,7 @@ export function resolveScalar(metric: Metric, range: TimeRange): number {
 export interface MetricPoint {
   label: string
   value: number
+  [key: string]: string | number
 }
 
 // Per-day series of a metric's value — for line charts driven by the chosen metric.
@@ -99,11 +110,15 @@ export function resolveSeries(range: TimeRange): SeriesPoint[] {
     }
   } else {
     for (let d = span - 1; d >= 0; d--) {
-      const ev = EVENTS.filter((e) => e.dayAgo === d)
-      buckets.push({
-        label: `D-${d}`,
-        Attempted: ev.length,
-        Connected: ev.filter((e) => e.connected).length,
+      BUCKETS.forEach((b, bi) => {
+        const ev = EVENTS.filter(
+          (e) => e.dayAgo === d && e.hour >= b && e.hour < b + 4
+        )
+        buckets.push({
+          label: bi === 0 ? dayLabel(d) : "",
+          Attempted: ev.length,
+          Connected: ev.filter((e) => e.connected).length,
+        })
       })
     }
   }
@@ -178,6 +193,59 @@ export function resolveAgentTable(range: TimeRange): AgentRow[] {
     .sort((a, b) => b.calls - a.calls)
 }
 
+// --- A/B variant comparison --------------------------------------------------
+// Per-agent funnel stats + daily series, for comparing two agent variants.
+export interface VariantStats {
+  agent: string
+  calls: number
+  connected: number
+  qualified: number
+  pickup: number // %
+  qualRate: number // % of connected that qualified
+  avgdur: number // seconds
+  talkTime: number // seconds
+}
+
+export function resolveVariantStats(agent: string, range: TimeRange): VariantStats {
+  const ev = EVENTS.filter((e) => inRange(e, range) && e.agent === agent)
+  const conn = ev.filter((e) => e.connected)
+  const qualified = ev.filter((e) => e.outcome === "Qualified").length
+  const talkTime = conn.reduce((a, e) => a + e.duration, 0)
+  return {
+    agent,
+    calls: ev.length,
+    connected: conn.length,
+    qualified,
+    pickup: ev.length ? (conn.length / ev.length) * 100 : 0,
+    qualRate: conn.length ? (qualified / conn.length) * 100 : 0,
+    avgdur: conn.length ? talkTime / conn.length : 0,
+    talkTime,
+  }
+}
+
+// Daily connected-call counts for each of two agents, aligned on the same days.
+export interface VariantSeriesPoint {
+  label: string
+  [agent: string]: string | number
+}
+
+export function resolveVariantSeries(
+  agents: string[],
+  range: TimeRange
+): VariantSeriesPoint[] {
+  const span = RANGE_DAYS[range]
+  const days = Array.from({ length: span }, (_, i) => span - 1 - i) // oldest → newest
+  return days.map((dayAgo) => {
+    const point: VariantSeriesPoint = { label: `Jun ${22 - dayAgo}` }
+    agents.forEach((agent) => {
+      point[agent] = EVENTS.filter(
+        (e) => e.dayAgo === dayAgo && e.agent === agent && e.connected
+      ).length
+    })
+    return point
+  })
+}
+
 export interface ConversationPoint {
   label: string
   Inbound: number
@@ -193,13 +261,21 @@ export function resolveConversations(range: TimeRange): ConversationPoint[] {
   const days = DAILY.filter((d) => d.dayAgo < span).sort(
     (a, b) => b.dayAgo - a.dayAgo
   )
-  return days.map((d) => ({
-    label: `Jun ${22 - d.dayAgo}`,
-    Inbound: d.inbound,
-    Outbound: d.outbound,
-    Web: d.web,
-    Tasks: d.tasksCreated,
-  }))
+  // Split each day's totals into spiky intra-day buckets (sum ≈ the daily value).
+  const out: ConversationPoint[] = []
+  days.forEach((d, di) => {
+    BUCKETS.forEach((_, bi) => {
+      const f = 0.55 + noise(di * 7 + bi) * 0.9
+      out.push({
+        label: bi === 0 ? dayLabel(d.dayAgo) : "",
+        Inbound: Math.round((d.inbound / BUCKETS.length) * f),
+        Outbound: Math.round((d.outbound / BUCKETS.length) * f),
+        Web: Math.round((d.web / BUCKETS.length) * f),
+        Tasks: Math.round((d.tasksCreated / BUCKETS.length) * f),
+      })
+    })
+  })
+  return out
 }
 
 export interface KpiSummary {
@@ -282,7 +358,12 @@ export function resolvePickupByTime(range: TimeRange): MetricPoint[] {
     }
   } else {
     for (let d = span - 1; d >= 0; d--) {
-      out.push({ label: `D-${d}`, value: pct(EVENTS.filter((e) => e.dayAgo === d)) })
+      BUCKETS.forEach((b, bi) => {
+        const ev = EVENTS.filter(
+          (e) => e.dayAgo === d && e.hour >= b && e.hour < b + 4
+        )
+        out.push({ label: bi === 0 ? dayLabel(d) : "", value: pct(ev) })
+      })
     }
   }
   return out
