@@ -3,8 +3,8 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   async redirects() {
     return [
-      // Land on the Overview dashboard.
-      { source: "/", destination: "/overview", permanent: false },
+      // Land on the Overview dashboard by default.
+      { source: "/", destination: "/overview", permanent: true },
     ];
   },
 };
