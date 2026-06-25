@@ -4,7 +4,6 @@ import * as React from "react"
 import { Bar, BarChart, CartesianGrid, Cell, XAxis, YAxis } from "recharts"
 import {
   Download,
-  Info,
   LayoutDashboard,
   Plus,
   RefreshCw,
@@ -23,13 +22,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover"
 import { Skeleton } from "@/components/ui/skeleton"
-import { DateRangePicker } from "@/components/date-range-picker"
+import { RangeDatePicker } from "@/components/range-date-picker"
 import { SYSTEM_METRICS } from "@/lib/insights/registry"
 import {
   useConversations,
@@ -73,13 +67,7 @@ interface StatCard {
   sub: string
   value: string
   highlight?: boolean
-  /** Extra rows revealed in the info popover. */
-  details: { label: string; value: string }[]
-  note?: string
 }
-
-const pct = (part: number, whole: number) =>
-  whole ? `${Math.round((part / whole) * 100)}%` : "0%"
 
 function StatCards({
   range,
@@ -106,110 +94,57 @@ function StatCards({
       label: "Inbound",
       sub: `Avg ${formatValue(data.inbound.avgDur, "duration")}`,
       value: formatValue(data.inbound.calls, "count"),
-      details: [
-        { label: "Calls", value: formatValue(data.inbound.calls, "count") },
-        { label: "Avg duration", value: formatValue(data.inbound.avgDur, "duration") },
-        { label: "Share of calls", value: pct(data.inbound.calls, totalCalls) },
-        { label: "Talk time", value: formatValue(data.inbound.calls * data.inbound.avgDur, "duration") },
-      ],
-      note: "Calls received by your agents in the selected range.",
     },
     {
       label: "Outbound",
       sub: `Avg ${formatValue(data.outbound.avgDur, "duration")}`,
       value: formatValue(data.outbound.calls, "count"),
-      details: [
-        { label: "Calls", value: formatValue(data.outbound.calls, "count") },
-        { label: "Avg duration", value: formatValue(data.outbound.avgDur, "duration") },
-        { label: "Share of calls", value: pct(data.outbound.calls, totalCalls) },
-        { label: "Talk time", value: formatValue(data.outbound.calls * data.outbound.avgDur, "duration") },
-      ],
-      note: "Calls placed by your agents in the selected range.",
     },
     {
       label: "Tasks",
       sub: `${formatValue(data.tasks.running, "count")} running`,
       value: formatValue(data.tasks.created, "count"),
-      details: [
-        { label: "Created", value: formatValue(data.tasks.created, "count") },
-        { label: "Running", value: formatValue(data.tasks.running, "count") },
-        { label: "Settled", value: formatValue(Math.max(0, data.tasks.created - data.tasks.running), "count") },
-        { label: "Running share", value: pct(data.tasks.running, data.tasks.created) },
-      ],
-      note: "Background tasks queued by conversations.",
     },
     {
       label: "Total Calls",
       sub: "All channels",
       value: formatValue(totalCalls, "count"),
       highlight: true,
-      details: [
-        { label: "Inbound", value: `${formatValue(data.inbound.calls, "count")} · ${pct(data.inbound.calls, totalCalls)}` },
-        { label: "Outbound", value: `${formatValue(data.outbound.calls, "count")} · ${pct(data.outbound.calls, totalCalls)}` },
-        { label: "Total", value: formatValue(totalCalls, "count") },
-      ],
-      note: "Inbound and outbound calls combined.",
     },
   ]
 
   return (
     <div className="grid h-full grid-cols-2 grid-rows-2 gap-4">
       {cards.map((c) => (
-        <Popover key={c.label}>
-          <PopoverTrigger asChild>
-            <button
-              type="button"
+        <div
+          key={c.label}
+          className={cn(
+            "flex h-full flex-col justify-between gap-3 rounded-xl border px-4 py-4",
+            c.highlight
+              ? "border-[#3a6ae6]/45 bg-[#3a6ae6]/10"
+              : "border-border bg-card"
+          )}
+        >
+          <div className="min-w-0">
+            <p
               className={cn(
-                "group flex h-full flex-col justify-between gap-3 rounded-xl border px-4 py-4 text-left transition-colors",
-                c.highlight
-                  ? "border-[#3a6ae6]/45 bg-[#3a6ae6]/10 hover:bg-[#3a6ae6]/15"
-                  : "border-border bg-card hover:border-border-strong hover:bg-surface-2/40"
+                "text-sm font-medium",
+                c.highlight ? "text-[#9cc0ff]" : "text-text"
               )}
             >
-              <div className="min-w-0">
-                <div className="flex items-center gap-1.5">
-                  <p
-                    className={cn(
-                      "text-sm font-medium",
-                      c.highlight ? "text-[#9cc0ff]" : "text-text"
-                    )}
-                  >
-                    {c.label}
-                  </p>
-                  <Info className="size-3.5 shrink-0 text-text-muted opacity-0 transition-opacity group-hover:opacity-100" />
-                </div>
-                <p className="mt-0.5 text-xs text-text-muted">{c.sub}</p>
-              </div>
-              <p
-                className={cn(
-                  "text-3xl font-semibold tracking-tight tabular-nums",
-                  c.highlight ? "text-[#cfe0ff]" : "text-text"
-                )}
-              >
-                {c.value}
-              </p>
-            </button>
-          </PopoverTrigger>
-          <PopoverContent align="start" className="w-64 p-0">
-            <div className="border-b px-4 py-2.5">
-              <p className="text-sm font-medium text-text">{c.label}</p>
-              {c.note && (
-                <p className="mt-0.5 text-xs text-text-muted">{c.note}</p>
-              )}
-            </div>
-            <dl className="px-4 py-2">
-              {c.details.map((d) => (
-                <div
-                  key={d.label}
-                  className="flex items-center justify-between py-1.5 text-sm"
-                >
-                  <dt className="text-text-muted">{d.label}</dt>
-                  <dd className="font-medium tabular-nums text-text">{d.value}</dd>
-                </div>
-              ))}
-            </dl>
-          </PopoverContent>
-        </Popover>
+              {c.label}
+            </p>
+            <p className="mt-0.5 text-xs text-text-muted">{c.sub}</p>
+          </div>
+          <p
+            className={cn(
+              "text-3xl font-semibold tracking-tight tabular-nums",
+              c.highlight ? "text-[#cfe0ff]" : "text-text"
+            )}
+          >
+            {c.value}
+          </p>
+        </div>
       ))}
     </div>
   )
@@ -362,8 +297,8 @@ function PickupPanel({
 
 export function OverviewPage() {
   const [range] = React.useState<TimeRange>("7d")
-  const [dateStart, setDateStart] = React.useState("2026-06-16T00:00")
-  const [dateEnd, setDateEnd] = React.useState("2026-06-23T23:59")
+  const [dateFrom, setDateFrom] = React.useState("2026-06-16")
+  const [dateTo, setDateTo] = React.useState("2026-06-23")
   const [agentId, setAgentId] = React.useState("")
   const [tab, setTab] = React.useState<string>("Overview")
   const [refreshKey, setRefreshKey] = React.useState(0)
@@ -513,12 +448,12 @@ export function OverviewPage() {
               <button className="flex items-center gap-1.5 text-sm text-text-dim hover:text-text">
                 Download csv <Download className="size-3.5" />
               </button>
-              <DateRangePicker
-                startValue={dateStart}
-                endValue={dateEnd}
-                onApply={(s, e) => {
-                  setDateStart(s)
-                  setDateEnd(e)
+              <RangeDatePicker
+                from={dateFrom}
+                to={dateTo}
+                onChange={(f, t) => {
+                  setDateFrom(f)
+                  setDateTo(t)
                 }}
               />
               <AgentPicker agentId={agentId} onChange={setAgentId} />

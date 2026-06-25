@@ -5,11 +5,17 @@ import { Bar, BarChart, Cell, LabelList, Pie, PieChart } from "recharts"
 import { CartesianGrid, Line, LineChart, XAxis, YAxis } from "recharts"
 import {
   Bell,
+  CalendarDays,
   Download,
+  Filter,
+  Globe,
+  Layers,
   Maximize2,
   MoreHorizontal,
+  Plus,
   RefreshCw,
   SlidersHorizontal,
+  X,
   type LucideIcon,
 } from "lucide-react"
 
@@ -44,9 +50,18 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { Skeleton } from "@/components/ui/skeleton"
+import { Input } from "@/components/ui/input"
+import {
+  Combobox,
+  ComboboxContent,
+  ComboboxEmpty,
+  ComboboxInput,
+  ComboboxItem,
+  ComboboxList,
+} from "@/components/ui/combobox"
 import { useGrouped } from "@/lib/insights/hooks"
 import { ChartToolbar } from "@/components/dashboard/chart-toolbar"
-import { FilterBuilder, type FilterRow } from "@/components/dashboard/filter-builder"
+import { FilterBuilder, newFilter, type FilterRow } from "@/components/dashboard/filter-builder"
 import {
   ChartDetail,
   RailColors,
@@ -158,6 +173,7 @@ export function PanelCard({
   children,
   enlargedViews,
   enlargeContent,
+  editContent,
   onEdit,
   dialogClassName = "sm:max-w-4xl",
 }: {
@@ -170,12 +186,15 @@ export function PanelCard({
   enlargedViews?: EnlargedView[]
   /** Full custom body for the enlarge dialog (replaces the toolbar + chart). */
   enlargeContent?: React.ReactNode
-  /** Opens the widget builder to configure this panel. */
+  /** Body for the ⋯ → Edit dialog (the chart settings rail). */
+  editContent?: React.ReactNode
+  /** Opens the widget builder to configure this panel (fallback when no editContent). */
   onEdit?: () => void
-  /** Width of the enlarge dialog. */
+  /** Width of the enlarge/edit dialog. */
   dialogClassName?: string
 }) {
   const [open, setOpen] = React.useState(false)
+  const [editOpen, setEditOpen] = React.useState(false)
   // Bumping this re-mounts the panel content, re-running its data hooks/loading.
   const [nonce, setNonce] = React.useState(0)
   const [view, setView] = React.useState(enlargedViews?.[0]?.key ?? "")
@@ -227,8 +246,12 @@ export function PanelCard({
                 <DropdownMenuItem onSelect={() => setNonce((n) => n + 1)}>
                   <RefreshCw /> Refresh
                 </DropdownMenuItem>
-                {onEdit && (
-                  <DropdownMenuItem onSelect={onEdit}>
+                {(editContent || onEdit) && (
+                  <DropdownMenuItem
+                    onSelect={() =>
+                      editContent ? setEditOpen(true) : onEdit?.()
+                    }
+                  >
                     <SlidersHorizontal /> Edit…
                   </DropdownMenuItem>
                 )}
@@ -277,6 +300,17 @@ export function PanelCard({
           )}
         </DialogContent>
       </Dialog>
+
+      {editContent && (
+        <Dialog open={editOpen} onOpenChange={setEditOpen}>
+          <DialogContent className={dialogClassName}>
+            <DialogHeader>
+              <DialogTitle>Edit · {title}</DialogTitle>
+            </DialogHeader>
+            <div className="min-h-0 flex-1 overflow-hidden">{editContent}</div>
+          </DialogContent>
+        </Dialog>
+      )}
     </>
   )
 }
@@ -489,9 +523,266 @@ const GROUP_OPTIONS = [
   { value: "callInfo.attempt", label: "Attempt" },
 ]
 
-// Expanded pie view — big labelled chart + editable rail (Display / Data /
-// Colors / Filters). Group by + Show actually re-query the chart.
-function PieDetail({
+// Small inline combobox for the query control bar.
+function Combo({
+  value,
+  items,
+  onChange,
+  width = 150,
+}: {
+  value: string
+  items: readonly string[]
+  onChange: (v: string) => void
+  width?: number
+}) {
+  return (
+    <Combobox items={items} value={value} onValueChange={onChange}>
+      <div style={{ width }}>
+        <ComboboxInput placeholder="Select" />
+        <ComboboxContent>
+          <ComboboxEmpty>No items found.</ComboboxEmpty>
+          <ComboboxList>
+            {(item) => (
+              <ComboboxItem key={item} value={item}>
+                {item}
+              </ComboboxItem>
+            )}
+          </ComboboxList>
+        </ComboboxContent>
+      </div>
+    </Combobox>
+  )
+}
+
+// Tiny seeded sparkline for the grouped results table.
+function Spark({ seed }: { seed: number }) {
+  const pts = Array.from({ length: 14 }, (_, k) => {
+    const r = Math.sin(seed * 13.1 + k * 7.3) * 43758.5453
+    const v = r - Math.floor(r)
+    return `${(k / 13) * 56 + 2},${16 - v * 13}`
+  }).join(" ")
+  return (
+    <svg width="60" height="18" className="text-text-muted" aria-hidden>
+      <polyline points={pts} fill="none" stroke="currentColor" strokeWidth="1" />
+    </svg>
+  )
+}
+
+// Enlarge view — a "Run Query" explorer: controls + chart + grouped results.
+function PieQueryView({
+  data,
+  donut: donutInit,
+  range,
+  refreshKey,
+  groupBy: groupByInit,
+}: {
+  data: { name: string; value: number }[]
+  donut?: boolean
+  percentages?: boolean
+  range?: TimeRange
+  refreshKey?: number
+  groupBy?: string
+}) {
+  const fieldByLabel = React.useMemo(
+    () => Object.fromEntries(GROUP_OPTIONS.map((o) => [o.label, o.value])),
+    []
+  )
+  const labelByField = React.useMemo(
+    () => Object.fromEntries(GROUP_OPTIONS.map((o) => [o.value, o.label])),
+    []
+  )
+  const donut = donutInit ?? true
+  const [measure, setMeasure] = React.useState("Calls")
+  const [agg, setAgg] = React.useState("Sum")
+  const [groupLabel, setGroupLabel] = React.useState(
+    labelByField[groupByInit ?? "outcome"] ?? "Outcome"
+  )
+  const [timeRange, setTimeRange] = React.useState("Last 6 hours")
+  const [granularity, setGranularity] = React.useState("5 minutes")
+  const [chartType, setChartType] = React.useState("Bar")
+  const [query, setQuery] = React.useState("")
+  const [filters, setFilters] = React.useState<FilterRow[]>([])
+  const { colorFor } = useChartColors(PIE_HEX)
+  const [active, setActive] = React.useState<number | null>(null)
+
+  const groupField = fieldByLabel[groupLabel] ?? "outcome"
+  const live = useGrouped(groupField, range ?? "today", refreshKey ?? 0)
+  const rows = range ? live.data : data
+  const total = rows.reduce((a, d) => a + d.value, 0)
+  const filtered = rows.filter((r) =>
+    r.name.toLowerCase().includes(query.trim().toLowerCase())
+  )
+
+  const donutChart = (
+    <ChartContainer config={{ value: { label: measure } } satisfies ChartConfig} className="mx-auto aspect-square h-full max-h-[320px] w-auto">
+      <PieChart>
+        <ChartTooltip cursor={false} content={<ChartTooltipContent hideLabel />} />
+        <Pie data={rows} dataKey="value" nameKey="name" outerRadius="82%" innerRadius={donut ? "56%" : "0%"} stroke="0" onMouseEnter={(_, i) => setActive(i)} onMouseLeave={() => setActive(null)}>
+          {rows.map((_, i) => (
+            <Cell key={i} fill={colorFor(i)} opacity={active === null || active === i ? 1 : 0.4} />
+          ))}
+        </Pie>
+      </PieChart>
+    </ChartContainer>
+  )
+
+  const barChart = (
+    <ChartContainer config={{ value: { label: measure } } satisfies ChartConfig} className="h-[320px] w-full">
+      <BarChart data={rows} margin={{ top: 8, right: 12, left: -12 }}>
+        <CartesianGrid vertical={false} />
+        <XAxis dataKey="name" tickLine={false} axisLine={false} tickMargin={8} />
+        <YAxis tickLine={false} axisLine={false} width={32} allowDecimals={false} />
+        <ChartTooltip cursor={false} content={<ChartTooltipContent hideLabel />} />
+        <Bar dataKey="value" radius={[4, 4, 0, 0]} maxBarSize={56}>
+          {rows.map((_, i) => (
+            <Cell key={i} fill={colorFor(i)} />
+          ))}
+        </Bar>
+      </BarChart>
+    </ChartContainer>
+  )
+
+  // The breakdown table doubles as the chart's legend (hover-linked).
+  const breakdown = (list: typeof rows, withSearch: boolean) => (
+    <div className="flex h-full flex-col">
+      {withSearch && rows.length > 8 && (
+        <Input
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Search…"
+          className="mb-2 h-9"
+        />
+      )}
+      <div className="flex items-center justify-between border-b border-border px-1 py-2 text-xs text-text-muted">
+        <span>{groupLabel}</span>
+        <span>{agg} of {measure}</span>
+      </div>
+      <div className="min-h-0 flex-1 overflow-y-auto">
+        {list.map((r) => {
+          const i = rows.indexOf(r)
+          return (
+            <div
+              key={r.name}
+              onMouseEnter={() => setActive(i)}
+              onMouseLeave={() => setActive(null)}
+              className="flex items-center gap-3 border-b border-border/60 px-1 py-2 text-sm last:border-0 hover:bg-surface-2/40"
+            >
+              <span className="size-2.5 shrink-0 rounded-full" style={{ background: colorFor(i) }} />
+              <span className="min-w-0 flex-1 truncate text-text">{r.name}</span>
+              <span className="text-text-muted">{Math.round((r.value / total) * 100)}%</span>
+              <span className="w-10 text-right tabular-nums text-text">{r.value}</span>
+              <Spark seed={i + 1} />
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+
+  return (
+    <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto pr-1">
+      <div className="rounded-xl border border-border bg-surface-2/30 p-4">
+        <p className="mb-3 text-[11px] font-medium text-text-muted">Query details</p>
+        <div className="grid grid-cols-[4.5rem_1.25rem_1fr] items-center gap-x-3 gap-y-3">
+          {/* Metric */}
+          <span className="text-sm text-text-muted">Metric</span>
+          <Globe className="size-4 text-text-muted" />
+          <div className="flex items-center gap-2">
+            <Combo value={measure} items={["Calls", "Connected", "Pickup rate"]} onChange={setMeasure} width={176} />
+            <Combo value={agg} items={["Sum", "Count", "Average", "Min", "Max"]} onChange={setAgg} width={112} />
+            <span className="ml-auto flex items-center gap-2">
+              <CalendarDays className="size-4 text-text-muted" />
+              <Combo value={timeRange} items={["Last 6 hours", "Last 24 hours", "Last 7 days", "Last 30 days"]} onChange={setTimeRange} width={150} />
+            </span>
+          </div>
+
+          {/* Group By */}
+          <span className="text-sm text-text-muted">Group By</span>
+          <Layers className="size-4 text-text-muted" />
+          <div className="flex items-center gap-2">
+            <Combo value={groupLabel} items={GROUP_OPTIONS.map((o) => o.label)} onChange={setGroupLabel} width={176} />
+            <button
+              type="button"
+              aria-label="Add group"
+              className="flex size-9 items-center justify-center rounded-md border border-border-strong text-text-muted transition-colors hover:text-text"
+            >
+              <Plus className="size-3.5" />
+            </button>
+          </div>
+
+          {/* Filter */}
+          <span className="self-start pt-2 text-sm text-text-muted">Filter</span>
+          <Filter className="mt-2 size-4 self-start text-text-muted" />
+          <div className="flex flex-wrap items-center gap-2">
+            {filters.map((f) => (
+              <span
+                key={f.id}
+                className="flex h-9 items-center gap-1.5 rounded-md border border-border-strong px-2.5 text-xs"
+              >
+                <span className="text-text">{f.field}</span>
+                <span className="text-text-muted">is</span>
+                <span className="text-text">{f.value || "any"}</span>
+                <button
+                  type="button"
+                  aria-label="Remove filter"
+                  onClick={() => setFilters(filters.filter((x) => x.id !== f.id))}
+                  className="text-text-muted hover:text-text"
+                >
+                  <X className="size-3" />
+                </button>
+              </span>
+            ))}
+            <button
+              type="button"
+              onClick={() => setFilters([...filters, newFilter()])}
+              className="flex h-9 items-center gap-1.5 rounded-md px-2 text-xs text-text-muted transition-colors hover:text-text"
+            >
+              <Filter className="size-3" /> Add filter
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Result card — one tidy unit; chart + breakdown side by side. */}
+      <div className="mt-1 rounded-xl border border-border">
+        <div className="flex items-center justify-between border-b border-border px-3 py-2">
+          {chartType === "Bar" ? (
+            <Combo value={granularity} items={["1 minute", "5 minutes", "30 minutes", "1 hour"]} onChange={setGranularity} width={130} />
+          ) : (
+            <span className="text-xs text-text-muted">
+              {agg} of {measure} · {timeRange.toLowerCase()}
+            </span>
+          )}
+          <SegmentedToggle
+            size="sm"
+            value={chartType}
+            onChange={setChartType}
+            options={[
+              { value: "Bar", label: "Bar" },
+              { value: "Pie", label: "Pie" },
+              { value: "Table", label: "Table" },
+            ]}
+          />
+        </div>
+        <div className="p-3">
+          {chartType === "Table" ? (
+            breakdown(filtered, true)
+          ) : (
+            <div className="flex flex-col gap-4 lg:flex-row">
+              <div className="flex min-w-0 flex-1 items-center justify-center">
+                {chartType === "Pie" ? donutChart : barChart}
+              </div>
+              <div className="w-full shrink-0 lg:w-80">{breakdown(rows, false)}</div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// Edit view — the two-pane chart styling rail (Display / Data / Colors / Filters).
+function PieEditView({
   data,
   donut: donutInit,
   percentages: pctInit,
@@ -530,8 +821,7 @@ function PieDetail({
   const groupField = fieldByLabel[groupLabel] ?? "outcome"
   const live = useGrouped(groupField, range ?? "today", refreshKey ?? 0)
   const base = range ? live.data : data
-  const chartData =
-    show === "All" ? base : base.slice(0, show === "Top 5" ? 5 : 8)
+  const chartData = show === "All" ? base : base.slice(0, show === "Top 5" ? 5 : 8)
 
   const RAD = Math.PI / 180
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -543,14 +833,7 @@ function PieDetail({
       ? `${p.name} ${Math.round(p.percent * 100)}%`
       : `${p.name} ${p.value}`
     return (
-      <text
-        x={x}
-        y={y}
-        textAnchor={x > p.cx ? "start" : "end"}
-        dominantBaseline="central"
-        fill="var(--text-dim)"
-        fontSize={11}
-      >
+      <text x={x} y={y} textAnchor={x > p.cx ? "start" : "end"} dominantBaseline="central" fill="var(--text-dim)" fontSize={11}>
         {txt}
       </text>
     )
@@ -558,30 +841,12 @@ function PieDetail({
 
   const chart = (
     <>
-      <ChartContainer
-        config={{ value: { label: measure } } satisfies ChartConfig}
-        className="mx-auto aspect-square h-full max-h-[640px] w-auto"
-      >
+      <ChartContainer config={{ value: { label: measure } } satisfies ChartConfig} className="mx-auto aspect-square h-full max-h-[640px] w-auto">
         <PieChart>
           <ChartTooltip cursor={false} content={<ChartTooltipContent hideLabel />} />
-          <Pie
-            data={chartData}
-            dataKey="value"
-            nameKey="name"
-            outerRadius="66%"
-            innerRadius={donut ? "40%" : "0%"}
-            stroke="0"
-            label={renderLabel}
-            labelLine={{ stroke: "var(--border-strong)" }}
-            onMouseEnter={(_, i) => setActive(i)}
-            onMouseLeave={() => setActive(null)}
-          >
+          <Pie data={chartData} dataKey="value" nameKey="name" outerRadius="66%" innerRadius={donut ? "40%" : "0%"} stroke="0" label={renderLabel} labelLine={{ stroke: "var(--border-strong)" }} onMouseEnter={(_, i) => setActive(i)} onMouseLeave={() => setActive(null)}>
             {chartData.map((_, i) => (
-              <Cell
-                key={i}
-                fill={colorFor(i)}
-                opacity={active === null || active === i ? 1 : 0.4}
-              />
+              <Cell key={i} fill={colorFor(i)} opacity={active === null || active === i ? 1 : 0.4} />
             ))}
           </Pie>
         </PieChart>
@@ -590,10 +855,7 @@ function PieDetail({
         <ul className="mt-2 flex flex-wrap justify-center gap-x-4 gap-y-1 text-xs">
           {chartData.map((d, i) => (
             <li key={d.name} className="flex items-center gap-1.5 text-text-muted">
-              <span
-                className="size-2 rounded-full"
-                style={{ background: colorFor(i) }}
-              />
+              <span className="size-2 rounded-full" style={{ background: colorFor(i) }} />
               {d.name}
             </li>
           ))}
@@ -606,48 +868,18 @@ function PieDetail({
     <ChartDetail chart={chart}>
       <RailGroup label="Display">
         <RailToggle label="Display as donut" checked={donut} onChange={setDonut} />
-        <RailToggle
-          label="Display as percentages"
-          checked={percentages}
-          onChange={setPercentages}
-        />
+        <RailToggle label="Display as percentages" checked={percentages} onChange={setPercentages} />
         <RailToggle label="Show legend" checked={showLegend} onChange={setShowLegend} />
       </RailGroup>
-
       <RailGroup label="Data">
-        <RailCombo
-          label="Measure"
-          value={measure}
-          onChange={setMeasure}
-          items={["Calls", "Connected"]}
-        />
-        <RailCombo
-          label="Group by"
-          value={groupLabel}
-          onChange={setGroupLabel}
-          items={GROUP_OPTIONS.map((o) => o.label)}
-        />
-        <RailCombo
-          label="Show"
-          value={show}
-          onChange={setShow}
-          items={["All", "Top 5", "Top 8"]}
-        />
-        <RailToggle
-          label="Show ungrouped"
-          checked={showUngrouped}
-          onChange={setShowUngrouped}
-        />
+        <RailCombo label="Measure" value={measure} onChange={setMeasure} items={["Calls", "Connected"]} />
+        <RailCombo label="Group by" value={groupLabel} onChange={setGroupLabel} items={GROUP_OPTIONS.map((o) => o.label)} />
+        <RailCombo label="Show" value={show} onChange={setShow} items={["All", "Top 5", "Top 8"]} />
+        <RailToggle label="Show ungrouped" checked={showUngrouped} onChange={setShowUngrouped} />
       </RailGroup>
-
       <RailGroup label="Colors">
-        <RailColors
-          names={chartData.map((d) => d.name)}
-          colorFor={colorFor}
-          onPick={pick}
-        />
+        <RailColors names={chartData.map((d) => d.name)} colorFor={colorFor} onPick={pick} />
       </RailGroup>
-
       <FilterBuilder filters={filters} onChange={setFilters} />
     </ChartDetail>
   )
@@ -847,7 +1079,18 @@ export function PiePanel({
       dialogClassName="flex h-[90vh] w-[94vw] max-w-[94vw] flex-col sm:max-w-[94vw]"
       enlargeContent={
         total > 0 ? (
-          <PieDetail
+          <PieQueryView
+            data={data}
+            donut={donut}
+            range={range}
+            refreshKey={refreshKey}
+            groupBy={groupBy}
+          />
+        ) : undefined
+      }
+      editContent={
+        total > 0 ? (
+          <PieEditView
             data={data}
             donut={donut}
             range={range}
