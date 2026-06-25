@@ -10,6 +10,7 @@ import {
   resolveAgentTable,
   resolveAttemptWise,
   resolveConversations,
+  resolveDurationFunnel,
   resolveGrouped,
   resolveHeatmap,
   resolveInboundAgentTable,
@@ -27,6 +28,7 @@ import {
   type AgentRow,
   type AttemptWiseRow,
   type ConversationPoint,
+  type FunnelStage,
   type GroupPoint,
   type HeatmapData,
   type InboundAgentRow,
@@ -102,6 +104,19 @@ export function useHeatmap(
   const loading = useLoadingFor(`heatmap|${range}|${refreshKey}`)
   const data = React.useMemo(
     () => resolveHeatmap(range),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [range, refreshKey]
+  )
+  return { data, loading }
+}
+
+export function useDurationFunnel(
+  range: TimeRange,
+  refreshKey = 0
+): DataResult<FunnelStage[]> {
+  const loading = useLoadingFor(`funnel|${range}|${refreshKey}`)
+  const data = React.useMemo(
+    () => resolveDurationFunnel(range),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [range, refreshKey]
   )

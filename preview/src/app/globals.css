@@ -106,7 +106,7 @@
 
   --background: var(--bg);
   --foreground: var(--text);
-  --card: var(--surface);
+  --card: #141414;
   --card-foreground: var(--text);
   --popover: var(--surface);
   --popover-foreground: var(--text);

@@ -2,12 +2,7 @@
 
 import * as React from "react"
 import { Bar, BarChart, CartesianGrid, Cell, XAxis, YAxis } from "recharts"
-import {
-  Download,
-  LayoutDashboard,
-  Plus,
-  RefreshCw,
-} from "lucide-react"
+import { LayoutDashboard, Plus, RefreshCw } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import {
@@ -41,8 +36,9 @@ import { ChartToolbar } from "./chart-toolbar"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { WidgetBuilder } from "./widget-builder"
 import { WidgetBoard, defaultLayout, type BoardLayout } from "./widget-board"
-import { BarDetail, LinePanel, PanelCard, PiePanel } from "./views/panels"
+import { BarDetail, BarDetailView, LinePanel, PanelCard, PiePanel } from "./views/panels"
 import { MetricBreakdown } from "./widgets/metric-breakdown"
+import { MetricDeepDive } from "./widgets/metric-deep-dive"
 import { WidgetRenderer } from "./widgets/widget-renderer"
 
 const PALETTE = [
@@ -196,6 +192,11 @@ function CallsPanel({
       ]}
       onEdit={onEdit}
       fill={fill}
+      enlargeContent={
+        loading ? undefined : (
+          <MetricDeepDive metric="calls" label="Calls" range={range} refreshKey={refreshKey} />
+        )
+      }
     />
   )
 }
@@ -246,7 +247,8 @@ function AgentBarPanel({
       onEdit={onEdit}
       className="aspect-square w-full"
       dialogClassName="flex h-[90vh] w-[94vw] max-w-[94vw] flex-col sm:max-w-[94vw]"
-      enlargeContent={loading ? undefined : <BarDetail data={data} />}
+      editContent={loading ? undefined : <BarDetail data={data} />}
+      enlargeContent={loading ? undefined : <BarDetailView data={data} />}
     >
       {loading ? (
         <Skeleton className="h-full min-h-[240px] w-full" />
@@ -291,6 +293,11 @@ function PickupPanel({
       data={data}
       series={[{ key: "value", label: "Pickup rate", color: "var(--chart-1)" }]}
       onEdit={onEdit}
+      enlargeContent={
+        loading ? undefined : (
+          <MetricDeepDive metric="pickup" label="Pickup Rate" range={range} refreshKey={refreshKey} />
+        )
+      }
     />
   )
 }
@@ -415,18 +422,6 @@ export function OverviewPage() {
         <header className="flex flex-col gap-3 border-b px-5 pt-3.5">
           <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
             <span className="text-[15px] font-semibold">Insights</span>
-            <div className="ml-auto flex gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setRefreshKey((k) => k + 1)}
-              >
-                <RefreshCw /> Refresh
-              </Button>
-              <Button size="sm" onClick={openBuilder}>
-                <Plus /> Add widget
-              </Button>
-            </div>
           </div>
           <Tabs value={tab} onValueChange={setTab}>
             {/* -ml offsets the list/trigger padding so the first tab lines up
@@ -441,27 +436,36 @@ export function OverviewPage() {
           </Tabs>
         </header>
 
-        <div className="overflow-x-hidden px-7 py-6">
-          {/* Sub-toolbar */}
-          <div className="flex flex-wrap items-center justify-end gap-3">
-            <div className="flex flex-wrap items-center gap-2.5">
-              <button className="flex items-center gap-1.5 text-sm text-text-dim hover:text-text">
-                Download csv <Download className="size-3.5" />
-              </button>
-              <RangeDatePicker
-                from={dateFrom}
-                to={dateTo}
-                onChange={(f, t) => {
-                  setDateFrom(f)
-                  setDateTo(t)
-                }}
-              />
-              <AgentPicker agentId={agentId} onChange={setAgentId} />
-            </div>
+        <div className="flex flex-wrap items-center justify-between gap-3 px-5 pt-4">
+          <div className="flex flex-wrap items-center gap-2">
+            <RangeDatePicker
+              from={dateFrom}
+              to={dateTo}
+              onChange={(f, t) => {
+                setDateFrom(f)
+                setDateTo(t)
+              }}
+            />
+            <AgentPicker agentId={agentId} onChange={setAgentId} />
           </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-9 px-3"
+              onClick={() => setRefreshKey((k) => k + 1)}
+            >
+              <RefreshCw /> Refresh
+            </Button>
+            <Button size="sm" className="h-9 px-3" onClick={openBuilder}>
+              <Plus /> Add widget
+            </Button>
+          </div>
+        </div>
 
+        <div className="overflow-x-hidden px-7 py-6">
           {/* Stats block + hero line */}
-          <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
             <StatCards range={range} refreshKey={refreshKey} />
             <ConversationsPanel range={range} refreshKey={refreshKey} />
           </div>

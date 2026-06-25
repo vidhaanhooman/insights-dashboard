@@ -5,17 +5,11 @@ import { Bar, BarChart, Cell, LabelList, Pie, PieChart } from "recharts"
 import { CartesianGrid, Line, LineChart, XAxis, YAxis } from "recharts"
 import {
   Bell,
-  CalendarDays,
   Download,
-  Filter,
-  Globe,
-  Layers,
   Maximize2,
   MoreHorizontal,
-  Plus,
   RefreshCw,
   SlidersHorizontal,
-  X,
   type LucideIcon,
 } from "lucide-react"
 
@@ -59,9 +53,9 @@ import {
   ComboboxItem,
   ComboboxList,
 } from "@/components/ui/combobox"
-import { useGrouped } from "@/lib/insights/hooks"
+import { useGrouped, useSeries } from "@/lib/insights/hooks"
 import { ChartToolbar } from "@/components/dashboard/chart-toolbar"
-import { FilterBuilder, newFilter, type FilterRow } from "@/components/dashboard/filter-builder"
+import { FilterBuilder, type FilterRow } from "@/components/dashboard/filter-builder"
 import {
   ChartDetail,
   RailColors,
@@ -329,6 +323,7 @@ export function LinePanel({
   loading,
   onEdit,
   fill,
+  enlargeContent,
 }: {
   title: string
   description?: string
@@ -338,6 +333,8 @@ export function LinePanel({
   onEdit?: () => void
   /** Stretch the chart to fill the card height (for tall, height-matched rows). */
   fill?: boolean
+  /** Override the default enlarge view (LineDetail) with a richer deep dive. */
+  enlargeContent?: React.ReactNode
 }) {
   const config = Object.fromEntries(
     series.map((s) => [s.key, { label: s.label, color: s.color }])
@@ -361,8 +358,9 @@ export function LinePanel({
       description={description}
       onEdit={onEdit}
       dialogClassName="flex h-[90vh] w-[94vw] max-w-[94vw] flex-col sm:max-w-[94vw]"
+      editContent={loading ? undefined : <LineDetail data={data} series={series} />}
       enlargeContent={
-        loading ? undefined : <LineDetail data={data} series={series} />
+        loading ? undefined : (enlargeContent ?? <LineDetailView data={data} series={series} />)
       }
     >
       {loading ? (
@@ -592,16 +590,13 @@ function PieQueryView({
     []
   )
   const donut = donutInit ?? true
-  const [measure, setMeasure] = React.useState("Calls")
-  const [agg, setAgg] = React.useState("Sum")
-  const [groupLabel, setGroupLabel] = React.useState(
-    labelByField[groupByInit ?? "outcome"] ?? "Outcome"
-  )
-  const [timeRange, setTimeRange] = React.useState("Last 6 hours")
+  // Query config lives in the Edit view; the enlarge view renders the result.
+  const measure = "Calls"
+  const agg = "Sum"
+  const groupLabel = labelByField[groupByInit ?? "outcome"] ?? "Outcome"
   const [granularity, setGranularity] = React.useState("5 minutes")
   const [chartType, setChartType] = React.useState("Bar")
   const [query, setQuery] = React.useState("")
-  const [filters, setFilters] = React.useState<FilterRow[]>([])
   const { colorFor } = useChartColors(PIE_HEX)
   const [active, setActive] = React.useState<number | null>(null)
 
@@ -612,6 +607,24 @@ function PieQueryView({
   const filtered = rows.filter((r) =>
     r.name.toLowerCase().includes(query.trim().toLowerCase())
   )
+
+  // Deeper-dive data for the metric.
+  const series = useSeries(range ?? "today", refreshKey ?? 0)
+  const agentData = useGrouped("agent", range ?? "today", refreshKey ?? 0)
+  const top = [...rows].sort((a, b) => b.value - a.value)[0]
+  const tiles = [
+    { label: `Total ${measure}`, value: total.toLocaleString() },
+    { label: `${groupLabel} values`, value: String(rows.length) },
+    {
+      label: `Top ${groupLabel.toLowerCase()}`,
+      value: top ? top.name : "—",
+      sub: top && total ? `${Math.round((top.value / total) * 100)}%` : "",
+    },
+    {
+      label: "Avg per value",
+      value: rows.length ? Math.round(total / rows.length).toLocaleString() : "0",
+    },
+  ]
 
   const donutChart = (
     <ChartContainer config={{ value: { label: measure } } satisfies ChartConfig} className="mx-auto aspect-square h-full max-h-[320px] w-auto">
@@ -680,77 +693,30 @@ function PieQueryView({
   )
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto pr-1">
-      <div className="rounded-xl border border-border bg-surface-2/30 p-4">
-        <p className="mb-3 text-[11px] font-medium text-text-muted">Query details</p>
-        <div className="grid grid-cols-[4.5rem_1.25rem_1fr] items-center gap-x-3 gap-y-3">
-          {/* Metric */}
-          <span className="text-sm text-text-muted">Metric</span>
-          <Globe className="size-4 text-text-muted" />
-          <div className="flex items-center gap-2">
-            <Combo value={measure} items={["Calls", "Connected", "Pickup rate"]} onChange={setMeasure} width={176} />
-            <Combo value={agg} items={["Sum", "Count", "Average", "Min", "Max"]} onChange={setAgg} width={112} />
-            <span className="ml-auto flex items-center gap-2">
-              <CalendarDays className="size-4 text-text-muted" />
-              <Combo value={timeRange} items={["Last 6 hours", "Last 24 hours", "Last 7 days", "Last 30 days"]} onChange={setTimeRange} width={150} />
-            </span>
-          </div>
-
-          {/* Group By */}
-          <span className="text-sm text-text-muted">Group By</span>
-          <Layers className="size-4 text-text-muted" />
-          <div className="flex items-center gap-2">
-            <Combo value={groupLabel} items={GROUP_OPTIONS.map((o) => o.label)} onChange={setGroupLabel} width={176} />
-            <button
-              type="button"
-              aria-label="Add group"
-              className="flex size-9 items-center justify-center rounded-md border border-border-strong text-text-muted transition-colors hover:text-text"
-            >
-              <Plus className="size-3.5" />
-            </button>
-          </div>
-
-          {/* Filter */}
-          <span className="self-start pt-2 text-sm text-text-muted">Filter</span>
-          <Filter className="mt-2 size-4 self-start text-text-muted" />
-          <div className="flex flex-wrap items-center gap-2">
-            {filters.map((f) => (
-              <span
-                key={f.id}
-                className="flex h-9 items-center gap-1.5 rounded-md border border-border-strong px-2.5 text-xs"
-              >
-                <span className="text-text">{f.field}</span>
-                <span className="text-text-muted">is</span>
-                <span className="text-text">{f.value || "any"}</span>
-                <button
-                  type="button"
-                  aria-label="Remove filter"
-                  onClick={() => setFilters(filters.filter((x) => x.id !== f.id))}
-                  className="text-text-muted hover:text-text"
-                >
-                  <X className="size-3" />
-                </button>
+    <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto pr-1">
+      {/* Summary tiles */}
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        {tiles.map((t) => (
+          <div key={t.label} className="rounded-xl border border-border bg-card p-3">
+            <p className="truncate text-xs text-text-muted">{t.label}</p>
+            <p className="mt-1 flex items-baseline gap-1.5">
+              <span className="truncate text-2xl font-semibold tracking-tight tabular-nums text-text">
+                {t.value}
               </span>
-            ))}
-            <button
-              type="button"
-              onClick={() => setFilters([...filters, newFilter()])}
-              className="flex h-9 items-center gap-1.5 rounded-md px-2 text-xs text-text-muted transition-colors hover:text-text"
-            >
-              <Filter className="size-3" /> Add filter
-            </button>
+              {t.sub && <span className="text-xs text-text-muted">{t.sub}</span>}
+            </p>
           </div>
-        </div>
+        ))}
       </div>
 
-      {/* Result card — one tidy unit; chart + breakdown side by side. */}
-      <div className="mt-1 rounded-xl border border-border">
+      {/* Result card — chart + breakdown side by side. */}
+      <div className="rounded-xl border border-border">
         <div className="flex items-center justify-between border-b border-border px-3 py-2">
           {chartType === "Bar" ? (
             <Combo value={granularity} items={["1 minute", "5 minutes", "30 minutes", "1 hour"]} onChange={setGranularity} width={130} />
           ) : (
             <span className="text-xs text-text-muted">
-              {agg} of {measure} · {timeRange.toLowerCase()}
+              {agg} of {measure} · {groupLabel.toLowerCase()}
             </span>
           )}
           <SegmentedToggle
@@ -775,6 +741,41 @@ function PieQueryView({
               <div className="w-full shrink-0 lg:w-80">{breakdown(rows, false)}</div>
             </div>
           )}
+        </div>
+      </div>
+
+      {/* Deeper dive — trend + secondary breakdown. */}
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <div className="rounded-xl border border-border p-4">
+          <p className="mb-3 text-sm font-medium text-text">{measure} over time</p>
+          <ChartContainer
+            config={{ Attempted: { label: measure, color: "var(--chart-1)" } } satisfies ChartConfig}
+            className="h-[220px] w-full"
+          >
+            <LineChart data={series.data} margin={{ top: 8, right: 12, left: -12 }}>
+              <CartesianGrid vertical={false} strokeDasharray="3 3" />
+              <XAxis dataKey="label" tickLine={false} axisLine={false} tickMargin={10} interval={0} />
+              <YAxis tickLine={false} axisLine={false} width={32} allowDecimals={false} />
+              <ChartTooltip content={<ChartTooltipContent />} />
+              <Line dataKey="Attempted" type="monotone" stroke="var(--chart-1)" strokeWidth={2} dot={false} />
+            </LineChart>
+          </ChartContainer>
+        </div>
+
+        <div className="rounded-xl border border-border p-4">
+          <p className="mb-3 text-sm font-medium text-text">{measure} by agent</p>
+          <ChartContainer
+            config={{ value: { label: measure, color: "var(--chart-1)" } } satisfies ChartConfig}
+            className="h-[220px] w-full"
+          >
+            <BarChart data={agentData.data} margin={{ top: 8, right: 12, left: -12 }}>
+              <CartesianGrid vertical={false} />
+              <XAxis dataKey="name" tickLine={false} axisLine={false} tickMargin={8} />
+              <YAxis tickLine={false} axisLine={false} width={32} allowDecimals={false} />
+              <ChartTooltip cursor={false} content={<ChartTooltipContent hideLabel />} />
+              <Bar dataKey="value" fill="var(--chart-1)" radius={[4, 4, 0, 0]} maxBarSize={40} />
+            </BarChart>
+          </ChartContainer>
         </div>
       </div>
     </div>
@@ -813,6 +814,7 @@ function PieEditView({
     labelByField[groupByInit ?? "outcome"] ?? "Outcome"
   )
   const [show, setShow] = React.useState("All")
+  const [timeRange, setTimeRange] = React.useState("Last 6 hours")
   const [showUngrouped, setShowUngrouped] = React.useState(false)
   const [filters, setFilters] = React.useState<FilterRow[]>([])
   const { colorFor, pick } = useChartColors(PIE_HEX)
@@ -872,8 +874,10 @@ function PieEditView({
         <RailToggle label="Show legend" checked={showLegend} onChange={setShowLegend} />
       </RailGroup>
       <RailGroup label="Data">
-        <RailCombo label="Measure" value={measure} onChange={setMeasure} items={["Calls", "Connected"]} />
+        <RailCombo label="Measure" value={measure} onChange={setMeasure} items={["Calls", "Connected", "Pickup rate"]} />
+        <RailCombo label="Aggregation" value="Sum" onChange={() => {}} items={["Sum", "Count", "Average", "Min", "Max"]} />
         <RailCombo label="Group by" value={groupLabel} onChange={setGroupLabel} items={GROUP_OPTIONS.map((o) => o.label)} />
+        <RailCombo label="Time range" value={timeRange} onChange={setTimeRange} items={["Last 6 hours", "Last 24 hours", "Last 7 days", "Last 30 days"]} />
         <RailCombo label="Show" value={show} onChange={setShow} items={["All", "Top 5", "Top 8"]} />
         <RailToggle label="Show ungrouped" checked={showUngrouped} onChange={setShowUngrouped} />
       </RailGroup>
@@ -896,6 +900,12 @@ function LineDetail({
   const [showLegend, setShowLegend] = React.useState(true)
   const [curve, setCurve] = React.useState("Smooth")
   const [dots, setDots] = React.useState(false)
+  const [measure, setMeasure] = React.useState("Calls")
+  const [agg, setAgg] = React.useState("Sum")
+  const [groupLabel, setGroupLabel] = React.useState("Outcome")
+  const [timeRange, setTimeRange] = React.useState("Last 6 hours")
+  const [show, setShow] = React.useState("All")
+  const [showUngrouped, setShowUngrouped] = React.useState(false)
   const [filters, setFilters] = React.useState<FilterRow[]>([])
   const seriesHex = series.map((s) => s.color)
   const { colorFor, pick } = useChartColors(seriesHex)
@@ -937,6 +947,14 @@ function LineDetail({
           items={["Smooth", "Straight"]}
         />
       </RailGroup>
+      <RailGroup label="Data">
+        <RailCombo label="Measure" value={measure} onChange={setMeasure} items={["Calls", "Connected", "Pickup rate"]} />
+        <RailCombo label="Aggregation" value={agg} onChange={setAgg} items={["Sum", "Count", "Average", "Min", "Max"]} />
+        <RailCombo label="Group by" value={groupLabel} onChange={setGroupLabel} items={GROUP_OPTIONS.map((o) => o.label)} />
+        <RailCombo label="Time range" value={timeRange} onChange={setTimeRange} items={["Last 6 hours", "Last 24 hours", "Last 7 days", "Last 30 days"]} />
+        <RailCombo label="Show" value={show} onChange={setShow} items={["All", "Top 5", "Top 8"]} />
+        <RailToggle label="Show ungrouped" checked={showUngrouped} onChange={setShowUngrouped} />
+      </RailGroup>
       <RailGroup label="Colors">
         <RailColors
           names={series.map((s) => s.label)}
@@ -958,6 +976,12 @@ export function BarDetail({
   const [horizontal, setHorizontal] = React.useState(false)
   const [showValues, setShowValues] = React.useState(false)
   const [sort, setSort] = React.useState("Descending")
+  const [measure, setMeasure] = React.useState("Calls")
+  const [agg, setAgg] = React.useState("Sum")
+  const [groupLabel, setGroupLabel] = React.useState("Agent")
+  const [timeRange, setTimeRange] = React.useState("Last 6 hours")
+  const [show, setShow] = React.useState("All")
+  const [showUngrouped, setShowUngrouped] = React.useState(false)
   const [filters, setFilters] = React.useState<FilterRow[]>([])
   const { colorFor, pick } = useChartColors(PIE_HEX)
 
@@ -1020,6 +1044,14 @@ export function BarDetail({
           items={["Descending", "Ascending", "Default"]}
         />
       </RailGroup>
+      <RailGroup label="Data">
+        <RailCombo label="Measure" value={measure} onChange={setMeasure} items={["Calls", "Connected", "Pickup rate"]} />
+        <RailCombo label="Aggregation" value={agg} onChange={setAgg} items={["Sum", "Count", "Average", "Min", "Max"]} />
+        <RailCombo label="Group by" value={groupLabel} onChange={setGroupLabel} items={GROUP_OPTIONS.map((o) => o.label)} />
+        <RailCombo label="Time range" value={timeRange} onChange={setTimeRange} items={["Last 6 hours", "Last 24 hours", "Last 7 days", "Last 30 days"]} />
+        <RailCombo label="Show" value={show} onChange={setShow} items={["All", "Top 5", "Top 8"]} />
+        <RailToggle label="Show ungrouped" checked={showUngrouped} onChange={setShowUngrouped} />
+      </RailGroup>
       <RailGroup label="Colors">
         <RailColors
           names={rows.map((d) => d.name)}
@@ -1029,6 +1061,151 @@ export function BarDetail({
       </RailGroup>
       <FilterBuilder filters={filters} onChange={setFilters} />
     </ChartDetail>
+  )
+}
+
+// Details-only enlarge for a line panel — big chart + per-series stats + table.
+// No config controls (those live in the Edit rail).
+function StatTiles({ tiles }: { tiles: { label: string; value: string; sub?: string }[] }) {
+  return (
+    <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      {tiles.map((t) => (
+        <div key={t.label} className="rounded-xl border border-border bg-card p-3">
+          <p className="truncate text-xs text-text-muted">{t.label}</p>
+          <p className="mt-1 flex items-baseline gap-1.5">
+            <span className="truncate text-2xl font-semibold tracking-tight tabular-nums text-text">
+              {t.value}
+            </span>
+            {t.sub && <span className="text-xs text-text-muted">{t.sub}</span>}
+          </p>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function LineDetailView({
+  data,
+  series,
+}: {
+  data: Record<string, string | number>[]
+  series: LineSeries[]
+}) {
+  const config = Object.fromEntries(
+    series.map((s) => [s.key, { label: s.label, color: s.color }])
+  ) satisfies ChartConfig
+
+  const tiles = series.map((s) => {
+    const vals = data.map((d) => Number(d[s.key]) || 0)
+    const total = vals.reduce((a, b) => a + b, 0)
+    return { label: `Total ${s.label}`, value: total.toLocaleString(), sub: `peak ${Math.max(...vals, 0)}` }
+  })
+  const tableRows = data.filter((d) => String(d.label ?? "").trim() !== "")
+
+  return (
+    <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto pr-1">
+      <StatTiles tiles={tiles} />
+      <div className="rounded-xl border border-border p-4">
+        <ChartContainer config={config} className="h-[340px] w-full">
+          <LineChart data={data} margin={{ top: 12, right: 16, left: 0 }}>
+            <CartesianGrid vertical={false} strokeDasharray="3 3" />
+            <XAxis dataKey="label" tickLine={false} axisLine={false} tickMargin={10} interval={0} />
+            <YAxis tickLine={false} axisLine={false} width={36} allowDecimals={false} />
+            <ChartTooltip content={<ChartTooltipContent />} />
+            <ChartLegend content={<ChartLegendContent />} />
+            {series.map((s) => (
+              <Line key={s.key} dataKey={s.key} type="monotone" stroke={s.color} strokeWidth={2} dot={false} />
+            ))}
+          </LineChart>
+        </ChartContainer>
+      </div>
+      <div className="overflow-hidden rounded-xl border border-border">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-border text-left text-xs text-text-muted">
+              <th className="px-4 py-2 font-medium">Period</th>
+              {series.map((s) => (
+                <th key={s.key} className="px-4 py-2 text-right font-medium">{s.label}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {tableRows.map((d, i) => (
+              <tr key={i} className="border-b border-border/60 last:border-0">
+                <td className="px-4 py-2 text-text">{String(d.label)}</td>
+                {series.map((s) => (
+                  <td key={s.key} className="px-4 py-2 text-right tabular-nums text-text-muted">
+                    {Number(d[s.key]) || 0}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  )
+}
+
+// Details-only enlarge for a bar panel — big chart + breakdown table. No config.
+export function BarDetailView({ data }: { data: { name: string; value: number }[] }) {
+  const total = data.reduce((a, d) => a + d.value, 0)
+  const sorted = [...data].sort((a, b) => b.value - a.value)
+  const top = sorted[0]
+  const tiles = [
+    { label: "Total", value: total.toLocaleString() },
+    { label: "Categories", value: String(data.length) },
+    { label: "Top", value: top ? top.name : "—", sub: top && total ? `${Math.round((top.value / total) * 100)}%` : "" },
+    { label: "Average", value: data.length ? Math.round(total / data.length).toLocaleString() : "0" },
+  ]
+
+  return (
+    <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto pr-1">
+      <StatTiles tiles={tiles} />
+      <div className="rounded-xl border border-border p-4">
+        <ChartContainer
+          config={{ value: { label: "Calls", color: "var(--chart-1)" } } satisfies ChartConfig}
+          className="h-[340px] w-full"
+        >
+          <BarChart data={sorted} margin={{ top: 12, right: 24, left: 0 }} barCategoryGap="22%">
+            <CartesianGrid vertical={false} />
+            <XAxis dataKey="name" tickLine={false} axisLine={false} tickMargin={8} />
+            <YAxis tickLine={false} axisLine={false} width={36} allowDecimals={false} />
+            <ChartTooltip cursor={false} content={<ChartTooltipContent hideLabel />} />
+            <Bar dataKey="value" radius={[4, 4, 0, 0]} maxBarSize={48}>
+              {sorted.map((_, i) => (
+                <Cell key={i} fill={PIE_HEX[i % PIE_HEX.length]} />
+              ))}
+            </Bar>
+          </BarChart>
+        </ChartContainer>
+      </div>
+      <div className="overflow-hidden rounded-xl border border-border">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-border text-left text-xs text-text-muted">
+              <th className="px-4 py-2 font-medium">Name</th>
+              <th className="px-4 py-2 text-right font-medium">Calls</th>
+              <th className="px-4 py-2 text-right font-medium">Share</th>
+            </tr>
+          </thead>
+          <tbody>
+            {sorted.map((d, i) => (
+              <tr key={i} className="border-b border-border/60 last:border-0">
+                <td className="flex items-center gap-2 px-4 py-2 text-text">
+                  <span className="size-2.5 rounded-full" style={{ background: PIE_HEX[i % PIE_HEX.length] }} />
+                  {d.name}
+                </td>
+                <td className="px-4 py-2 text-right tabular-nums text-text-muted">{d.value}</td>
+                <td className="px-4 py-2 text-right tabular-nums text-text-muted">
+                  {total ? Math.round((d.value / total) * 100) : 0}%
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
   )
 }
 

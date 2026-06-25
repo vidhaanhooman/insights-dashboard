@@ -524,3 +524,24 @@ export function resolveHeatmap(range: TimeRange): HeatmapData {
   }
   return { cols: HEATMAP_COLS, rows, max }
 }
+
+// --- Duration funnel ---------------------------------------------------------
+// Connected calls surviving past each duration threshold — a "how long did
+// calls last" funnel. value = calls longer than the stage's threshold.
+export interface FunnelStage {
+  stage: string
+  value: number
+  pctOfFirst: number
+}
+
+const FUNNEL_THRESHOLDS = [0, 15, 30, 60, 120]
+const FUNNEL_LABELS = ["Connected (>0s)", ">15s", ">30s", ">60s", ">120s"]
+
+export function resolveDurationFunnel(range: TimeRange): FunnelStage[] {
+  const conn = EVENTS.filter((e) => inRange(e, range) && e.connected)
+  const first = conn.length || 1
+  return FUNNEL_THRESHOLDS.map((t, i) => {
+    const value = conn.filter((e) => e.duration > t).length
+    return { stage: FUNNEL_LABELS[i], value, pctOfFirst: Math.round((value / first) * 100) }
+  })
+}
