@@ -75,7 +75,7 @@ export function ComboboxInput({
       <button
         type="button"
         className={cn(
-          "flex h-8 w-full items-center justify-between gap-2 rounded-md border border-input bg-transparent px-2.5 text-xs outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50",
+          "flex h-9 w-full items-center justify-between gap-2 rounded-md border border-input bg-transparent px-3 text-sm outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50",
           value ? "text-text" : "text-text-muted",
           className
         )}
@@ -139,7 +139,7 @@ export function ComboboxItem({
       type="button"
       onClick={() => select(itemValue)}
       className={cn(
-        "flex w-full items-center justify-between rounded-md px-2.5 py-1.5 text-left text-xs transition-colors hover:bg-surface-2",
+        "flex w-full items-center justify-between rounded-md px-2 py-1.5 text-left text-sm transition-colors hover:bg-surface-2",
         selected && "bg-surface-2 text-text"
       )}
     >

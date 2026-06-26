@@ -94,7 +94,7 @@ export function RangeCalendar({ from, to, onChange }: RangeCalendarProps) {
   }
 
   return (
-    <div className="rounded-xl border border-border bg-surface-2/40 p-2.5">
+    <div className="w-full rounded-xl border border-border bg-surface-2/40 p-2.5">
       <div className="mb-1 flex items-center justify-between">
         <button
           type="button"

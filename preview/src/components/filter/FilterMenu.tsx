@@ -509,27 +509,6 @@ export function FilterMenu(props: FilterMenuProps) {
         </div>
       </div>
 
-      {/* header — active count + Clear all only when there are filters */}
-      {(() => {
-        const activeCount = filters.conditions.filter(conditionIsActive).length;
-        if (!activeCount) return null;
-        return (
-          <div className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] text-text-muted">
-            <span>
-              <span className="font-medium text-text">{activeCount}</span> active
-            </span>
-            <span className="text-text-dim">·</span>
-            <button
-              type="button"
-              onClick={() => dispatch({ type: "CLEAR_CONDITIONS" })}
-              className="text-text-dim hover:text-text"
-            >
-              Clear all
-            </button>
-          </div>
-        );
-      })()}
-
       {/* category list — scrolls on small viewports */}
       <div className="min-h-0 flex-1 overflow-y-auto py-1 scroll-thin">
         {visibleSections.length === 0 && (
@@ -614,8 +593,8 @@ export function FilterMenu(props: FilterMenuProps) {
         </div>
       )}
 
-      {/* footer — Clear + Done */}
-      <div className="flex items-center justify-between gap-2 border-t border-border px-2 py-2">
+      {/* footer — Clear + Add, matches main DialogFooter */}
+      <div className="flex h-[57px] shrink-0 items-center justify-between gap-2 border-t bg-[#141414] px-7">
         <button
           type="button"
           onClick={() => dispatch({ type: "CLEAR_CONDITIONS" })}
@@ -629,7 +608,7 @@ export function FilterMenu(props: FilterMenuProps) {
           onClick={close}
           className="rounded-md bg-text px-3 py-1.5 text-xs font-medium text-bg transition-colors hover:bg-text/90"
         >
-          Done
+          Add
         </button>
       </div>
     </div>

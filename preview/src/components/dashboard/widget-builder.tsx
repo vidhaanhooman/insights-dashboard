@@ -24,6 +24,7 @@ import {
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Field, FieldLabel as UIFieldLabel } from "@/components/ui/field"
 import {
   Select,
   SelectContent,
@@ -34,6 +35,7 @@ import {
 import { Switch } from "@/components/ui/switch"
 import { RANGE_LABEL } from "@/lib/insights/mock-data"
 import { SYSTEM_METRICS, VIZ, SPAN_FOR_TYPE, SCALAR_TYPES } from "@/lib/insights/registry"
+import { WidgetRenderer } from "@/components/dashboard/widgets/widget-renderer"
 import type {
   GroupField,
   Metric,
@@ -195,19 +197,55 @@ export function WidgetBuilder({
   onUpdate?: (id: string, patch: WidgetPatch, extraMetric: Metric | null) => void
   editing?: BuilderTarget | null
 }) {
+  const isEditing = !!editing
+  const [filterOpen, setFilterOpen] = React.useState(false)
   return (
     <Dialog open={open} onOpenChange={onOpenChange} modal={false}>
+      {open && (
+        <div
+          aria-hidden
+          className="fixed inset-0 z-40 bg-black/40 backdrop-blur-md"
+          onClick={() => onOpenChange(false)}
+        />
+      )}
       <DialogContent
-        className="flex h-[92vh] max-h-[92vh] w-[calc(100vw-2rem)] max-w-[calc(100vw-2rem)] flex-col gap-0 overflow-hidden bg-[#141414] p-0 data-open:zoom-in-100 sm:max-w-[calc(100vw-2rem)] xl:w-[680px] xl:max-w-[680px]"
+        className={cn(
+          "flex h-[92vh] max-h-[92vh] w-[calc(100vw-2rem)] max-w-[calc(100vw-2rem)] flex-col gap-0 overflow-hidden bg-[#141414] p-0 sm:max-w-[calc(100vw-2rem)]",
+          "data-open:!animate-none data-closed:!animate-none [--tw-enter-scale:1]",
+          isEditing
+            ? "xl:w-[1180px] xl:max-w-[1180px]"
+            : filterOpen
+              ? "xl:w-[1080px] xl:max-w-[1080px]"
+              : "xl:w-[780px] xl:max-w-[780px]"
+        )}
         onInteractOutside={(event) => event.preventDefault()}
       >
-        <BuilderForm
-          key={editing?.widget.id ?? "new"}
-          editing={editing}
-          onAdd={onAdd}
-          onUpdate={onUpdate}
-          onClose={() => onOpenChange(false)}
-        />
+        <div className="flex h-full min-h-0 flex-1">
+          {isEditing && editing && (
+            <div className="hidden flex-1 flex-col border-r border-border bg-[#0c0c0c] p-6 xl:flex">
+              <p className="mb-3 text-[11px] font-medium text-text-muted">Preview</p>
+              <div className="flex flex-1 flex-col overflow-hidden rounded-lg border border-border bg-[#141414] p-3">
+                <WidgetRenderer
+                  widget={editing.widget}
+                  metricsById={Object.fromEntries(SYSTEM_METRICS.map((m) => [m.id, m]))}
+                  range="7d"
+                  refreshKey={0}
+                  ctl={{}}
+                />
+              </div>
+            </div>
+          )}
+          <div className={cn("flex h-full min-w-0 flex-1 flex-col", isEditing && "xl:w-[680px] xl:flex-none xl:shrink-0")}>
+            <BuilderForm
+              key={editing?.widget.id ?? "new"}
+              editing={editing}
+              onAdd={onAdd}
+              onUpdate={onUpdate}
+              onClose={() => onOpenChange(false)}
+              onFilterPanelChange={setFilterOpen}
+            />
+          </div>
+        </div>
       </DialogContent>
     </Dialog>
   )
@@ -215,7 +253,7 @@ export function WidgetBuilder({
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
-    <p className="text-[11px] font-semibold uppercase tracking-wider text-text-muted">{children}</p>
+    <p className="text-[13px] font-semibold text-text">{children}</p>
   )
 }
 
@@ -244,7 +282,7 @@ function SectionShell({
 }
 
 function RequiredMark() {
-  return <span className="text-brand" aria-hidden="true">*</span>
+  return <span className="text-text-muted" aria-hidden="true">*</span>
 }
 
 function FieldLabel({
@@ -255,7 +293,7 @@ function FieldLabel({
   required?: boolean
 }) {
   return (
-    <Label className="text-[11px] font-medium uppercase tracking-wider text-text-muted">
+    <Label className="text-xs font-normal text-text-muted">
       {children} {required && <RequiredMark />}
     </Label>
   )
@@ -370,15 +408,24 @@ function MetricPicker({
         if (m) onChange(m.id)
       }}
     >
-      <ComboboxInput className="h-9 rounded-lg text-sm" placeholder={placeholder} />
+      <ComboboxInput placeholder={placeholder} className="!bg-[#141414]" />
       <ComboboxContent>
         <ComboboxEmpty>No metrics found.</ComboboxEmpty>
         <ComboboxList>
-          {(item) => (
-            <ComboboxItem key={item} value={item}>
-              {item}
-            </ComboboxItem>
-          )}
+          {(item) => {
+            const metric = SYSTEM_METRICS.find((m) => m.label === item)
+            const desc = metric ? METRIC_DESC[metric.id] : undefined
+            return (
+              <ComboboxItem key={item} value={item}>
+                <span className="flex flex-col gap-0.5">
+                  <span className="whitespace-nowrap text-sm text-text">{item}</span>
+                  {desc && (
+                    <span className="text-xs leading-snug text-text-muted">{desc}</span>
+                  )}
+                </span>
+              </ComboboxItem>
+            )
+          }}
         </ComboboxList>
       </ComboboxContent>
     </Combobox>
@@ -441,7 +488,7 @@ function GroupByMultiPicker({
                   }
                   className={cn(
                     "flex w-full items-center gap-2.5 rounded-md px-2 py-1.5 text-left transition-colors",
-                    on ? "bg-accent/40" : "hover:bg-accent/20"
+                    on ? "bg-surface-2/60" : "hover:bg-surface-2/40"
                   )}
                 >
                   <span
@@ -476,11 +523,13 @@ function BuilderForm({
   onAdd,
   onUpdate,
   onClose,
+  onFilterPanelChange,
 }: {
   editing?: BuilderTarget | null
   onAdd: (widget: Widget, extraMetric: Metric | null) => void
   onUpdate?: (id: string, patch: WidgetPatch, extraMetric: Metric | null) => void
   onClose: () => void
+  onFilterPanelChange?: (open: boolean) => void
 }) {
   const isEdit = !!editing
   // Metric (number) widgets get a focused, per-metric edit view — no chart chrome.
@@ -542,9 +591,15 @@ function BuilderForm({
   const [numberDecimals, setNumberDecimals] = React.useState<number>(
     editing?.widget.config.numberDecimals ?? 0
   )
+  const [numberUnit, setNumberUnit] = React.useState<string>("none")
+  const [numberUnitPosition, setNumberUnitPosition] = React.useState<"left" | "right">("right")
   const [showDataLabels, setShowDataLabels] = React.useState(
     editing?.widget.config.showDataLabels ?? false
   )
+  const [pieShowLabels, setPieShowLabels] = React.useState(true)
+  const [pieSort, setPieSort] = React.useState<"value-desc" | "value-asc" | "alpha">("value-desc")
+  const [pieGroupSmall, setPieGroupSmall] = React.useState<"off" | "5" | "10">("off")
+  const [piePalette, setPiePalette] = React.useState<"default" | "warm" | "cool" | "categorical">("default")
   const [editVizOpen, setEditVizOpen] = React.useState(false)
   const [widgetGroupBy, setWidgetGroupBy] = React.useState<string>(
     editing?.widget.config.groupBy ?? "None"
@@ -558,6 +613,9 @@ function BuilderForm({
   )
   const [titleTouched, setTitleTouched] = React.useState(!!editing?.widget.title)
   const [filterPanelFor, setFilterPanelFor] = React.useState<string | null>(null)
+  React.useEffect(() => {
+    onFilterPanelChange?.(filterPanelFor !== null)
+  }, [filterPanelFor, onFilterPanelChange])
   const [filterCollapsed, setFilterCollapsed] = React.useState(false)
 
   const titleValid = title.trim().length >= 2
@@ -623,7 +681,7 @@ function BuilderForm({
         : hasDuplicateNames
           ? "Metric names must be unique."
           : null
-  const saveLabel = isEdit ? "Save changes" : "Add widget"
+  const saveLabel = isEdit ? "Save" : "Add widget"
   const summary = `${
     vizLabel
   } widget showing ${metricLabel || "a metric"} from ${dataSource} for ${
@@ -715,8 +773,11 @@ function BuilderForm({
       config.showLegend = showLegend
     }
     if (viz === "number") {
-      if (numberPrefix) config.numberPrefix = numberPrefix
-      if (numberSuffix) config.numberSuffix = numberSuffix
+      const symbol = numberUnit === "none" ? "" : numberUnit
+      const prefix = numberUnitPosition === "left" ? symbol : numberPrefix
+      const suffix = numberUnitPosition === "right" ? symbol : numberSuffix
+      if (prefix) config.numberPrefix = prefix
+      if (suffix) config.numberSuffix = suffix
       config.numberDecimals = numberDecimals
     }
     if (viz === "line" || viz === "bar") {
@@ -823,14 +884,15 @@ function BuilderForm({
   return (
     <div className="flex h-full min-h-0">
       <div className="flex min-w-0 flex-1 flex-col">
-      <DialogHeader className="shrink-0 border-b px-7 py-4">
-        <DialogTitle className="text-[15px] font-semibold tracking-tight">
+      <DialogHeader className="flex h-[57px] shrink-0 flex-row items-center gap-2 border-b px-7">
+        <Plus className="size-4 text-text-muted" />
+        <DialogTitle className="font-heading text-base leading-none font-medium">
           {metricMode ? "Edit metric" : isEdit ? "Edit widget" : "Add widget"}
         </DialogTitle>
       </DialogHeader>
 
       <div className="flex-1 min-h-0 overflow-y-auto px-7 py-4">
-        <div className="mx-auto flex h-full max-w-[560px] flex-col divide-y divide-border">
+        <div className="flex h-full flex-col divide-y divide-border">
           {!metricMode && (<>
           <div className="space-y-1.5 pb-3">
             <FieldLabel required>Title</FieldLabel>
@@ -842,7 +904,7 @@ function BuilderForm({
               }}
               placeholder="Untitled widget"
               aria-invalid={!titleValid && title.length > 0}
-              className="h-9"
+              className="!bg-[#141414] dark:!bg-[#141414] dark:hover:!bg-[#141414]"
             />
             {!titleTouched && suggestedTitle && (
               <button
@@ -859,17 +921,7 @@ function BuilderForm({
           </div>
 
           <div className="space-y-1.5 py-3">
-            <div className="flex items-center justify-between">
-              <FieldLabel>Visualization</FieldLabel>
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                onClick={() => setEditVizOpen((v) => !v)}
-              >
-                {editVizOpen ? "Done" : "Edit"}
-              </Button>
-            </div>
+            <FieldLabel>Visualization</FieldLabel>
             <div className="flex w-full items-center gap-0.5 rounded-md border border-border bg-[#141414] p-0.5">
               {VIZ.map((v) => {
                 const active = viz === v.type
@@ -883,39 +935,132 @@ function BuilderForm({
                     className={cn(
                       "flex flex-1 items-center justify-center gap-1.5 rounded-[5px] px-2 py-1.5 text-xs font-medium transition-colors",
                       active
-                        ? "bg-accent-dim text-text shadow-sm ring-1 ring-ring/40"
+                        ? "bg-surface-2 text-text shadow-sm"
                         : "text-text-muted hover:bg-surface-2/60 hover:text-text"
                     )}
                   >
-                    <v.Icon className={cn("size-3.5", active && "text-brand")} />
+                    <v.Icon className={cn("size-3.5", active && "text-text")} />
                     <span>{v.label}</span>
                   </button>
                 )
               })}
             </div>
-            {editVizOpen && (
+            {isEdit && viz === "number" && (
+              <div className="space-y-2 pt-2">
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="space-y-1">
+                    <FieldLabel>Units</FieldLabel>
+                    <Select value={numberUnit} onValueChange={setNumberUnit}>
+                      <SelectTrigger className="w-full">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">None</SelectItem>
+                        <SelectItem value="$">$ — US Dollar</SelectItem>
+                        <SelectItem value="€">€ — Euro</SelectItem>
+                        <SelectItem value="£">£ — Pound</SelectItem>
+                        <SelectItem value="₹">₹ — Rupee</SelectItem>
+                        <SelectItem value="%">% — Percent</SelectItem>
+                        <SelectItem value="s">s — Seconds</SelectItem>
+                        <SelectItem value="ms">ms — Milliseconds</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1">
+                    <FieldLabel>Position</FieldLabel>
+                    <Select value={numberUnitPosition} onValueChange={(v) => setNumberUnitPosition(v as "left" | "right")}>
+                      <SelectTrigger className="w-full">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="left">Left</SelectItem>
+                        <SelectItem value="right">Right</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1">
+                    <FieldLabel>Decimals</FieldLabel>
+                    <Input
+                      type="number"
+                      min={0}
+                      max={6}
+                      value={numberDecimals}
+                      onChange={(e) =>
+                        setNumberDecimals(Math.max(0, Math.min(6, Number(e.target.value) || 0)))
+                      }
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+            {isEdit && (
               <div className="space-y-2 pt-2">
                 {viz === "number" && (
                   <div className="grid grid-cols-3 gap-2">
                     <div className="space-y-1">
                       <FieldLabel>Prefix</FieldLabel>
-                      <Input value={numberPrefix} onChange={(e) => setNumberPrefix(e.target.value)} placeholder="$ ₹" className="h-8" />
+                      <Input value={numberPrefix} onChange={(e) => setNumberPrefix(e.target.value)} placeholder="$ ₹" />
                     </div>
                     <div className="space-y-1">
                       <FieldLabel>Suffix</FieldLabel>
-                      <Input value={numberSuffix} onChange={(e) => setNumberSuffix(e.target.value)} placeholder="% k" className="h-8" />
+                      <Input value={numberSuffix} onChange={(e) => setNumberSuffix(e.target.value)} placeholder="% k" />
                     </div>
                     <div className="space-y-1">
                       <FieldLabel>Decimals</FieldLabel>
-                      <Input type="number" min={0} max={6} value={numberDecimals} onChange={(e) => setNumberDecimals(Math.max(0, Math.min(6, Number(e.target.value) || 0)))} className="h-8" />
+                      <Input type="number" min={0} max={6} value={numberDecimals} onChange={(e) => setNumberDecimals(Math.max(0, Math.min(6, Number(e.target.value) || 0)))} />
                     </div>
                   </div>
                 )}
                 {viz === "pie" && (
-                  <div className="space-y-1.5">
-                    <ToggleRow title="Donut" checked={donut} onCheckedChange={setDonut} />
-                    <ToggleRow title="Show percentages" checked={percentages} onCheckedChange={setPercentages} />
-                    <ToggleRow title="Show legend" checked={showLegend} onCheckedChange={setShowLegend} />
+                  <div className="space-y-3">
+                    <div className="space-y-1.5">
+                      <ToggleRow title="Donut" checked={donut} onCheckedChange={setDonut} />
+                      <ToggleRow title="Show labels" checked={pieShowLabels} onCheckedChange={setPieShowLabels} />
+                      <ToggleRow title="Show percentages" checked={percentages} onCheckedChange={setPercentages} />
+                      <ToggleRow title="Show legend" checked={showLegend} onCheckedChange={setShowLegend} />
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="space-y-1">
+                        <FieldLabel>Sort</FieldLabel>
+                        <Select value={pieSort} onValueChange={(v) => setPieSort(v as typeof pieSort)}>
+                          <SelectTrigger className="w-full">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="value-desc">Value (high to low)</SelectItem>
+                            <SelectItem value="value-asc">Value (low to high)</SelectItem>
+                            <SelectItem value="alpha">Alphabetical</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-1">
+                        <FieldLabel>Group small as &ldquo;Other&rdquo;</FieldLabel>
+                        <Select value={pieGroupSmall} onValueChange={(v) => setPieGroupSmall(v as typeof pieGroupSmall)}>
+                          <SelectTrigger className="w-full">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="off">Off</SelectItem>
+                            <SelectItem value="5">Below 5%</SelectItem>
+                            <SelectItem value="10">Below 10%</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="col-span-2 space-y-1">
+                        <FieldLabel>Color palette</FieldLabel>
+                        <Select value={piePalette} onValueChange={(v) => setPiePalette(v as typeof piePalette)}>
+                          <SelectTrigger className="w-full">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="default">Default</SelectItem>
+                            <SelectItem value="warm">Warm</SelectItem>
+                            <SelectItem value="cool">Cool</SelectItem>
+                            <SelectItem value="categorical">Categorical</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
                   </div>
                 )}
                 {(viz === "line" || viz === "bar") && (
@@ -979,30 +1124,32 @@ function BuilderForm({
                           const showName = viz === "table"
                           const cols = showName ? "sm:grid-cols-2" : ""
                           return (
-                            <div className={cn("grid gap-2", cols)}>
+                            <div className={cn("grid items-end gap-2", cols)}>
                               {showName && (
-                                <div className="space-y-1">
-                                  <FieldLabel>Name</FieldLabel>
+                                <Field>
+                                  <UIFieldLabel htmlFor={`metric-name-${block.id}`}>Name</UIFieldLabel>
                                   <Input
+                                    id={`metric-name-${block.id}`}
                                     value={block.name}
                                     onChange={(e) => patchBlock(block.id, { name: e.target.value })}
                                     placeholder="Optional"
                                     aria-invalid={isDup}
-                                    className={cn("h-9", isDup && "border-destructive focus-visible:ring-destructive/40")}
+                                    style={{ height: 32 }}
+                                    className={cn("rounded-lg border border-input !bg-[#141414] py-2 pr-2 pl-2.5 text-sm hover:!bg-[#141414] dark:!bg-[#141414] dark:hover:!bg-[#141414]", isDup && "border-destructive focus-visible:ring-destructive/40")}
                                   />
                                   {isDup && (
                                     <p className="text-[11px] text-destructive">Name already used.</p>
                                   )}
-                                </div>
+                                </Field>
                               )}
-                              <div className="space-y-1">
-                                {showName && <FieldLabel>Measure</FieldLabel>}
+                              <Field>
+                                {showName && <UIFieldLabel>Measure</UIFieldLabel>}
                                 <MetricPicker
                                   value={block.metricId}
                                   onChange={(value) => updateMetric(block.id, value)}
                                   placeholder="Select metric"
                                 />
-                              </div>
+                              </Field>
                             </div>
                           )
                         })()}
@@ -1012,16 +1159,19 @@ function BuilderForm({
                           const isOpen = filterPanelFor === block.id
                           return (
                             <div className="space-y-2">
-                              <div className="flex items-center justify-end">
-                                <Button
-                                  type="button"
-                                  variant="outline"
-                                  onClick={() => setFilterPanelFor(isOpen ? null : block.id)}
-                                >
-                                  <FunnelIcon />
-                                  {activeConds.length > 0 ? `Filters · ${activeConds.length}` : "Add filter"}
-                                </Button>
-                              </div>
+                              <button
+                                type="button"
+                                onClick={() => setFilterPanelFor(isOpen ? null : block.id)}
+                                className={cn(
+                                  "inline-flex items-center gap-1.5 text-[12px] transition-colors",
+                                  isOpen
+                                    ? "text-text"
+                                    : "text-text-muted hover:text-text"
+                                )}
+                              >
+                                <FunnelIcon className="size-3.5" />
+                                {activeConds.length > 0 ? `Filters · ${activeConds.length}` : "Add filter"}
+                              </button>
                               {activeConds.length > 0 && (
                                 <div className="flex flex-wrap gap-1.5">
                                   {activeConds.map((c) => {
@@ -1081,22 +1231,32 @@ function BuilderForm({
             )}
           </div>
 
-          {!metricMode && viz !== "table" && (
+          {!metricMode && viz !== "table" && viz !== "number" && viz !== "pie" && (
             <div className="space-y-1.5 py-3">
               <FieldLabel>Group by</FieldLabel>
               <div className="flex gap-2">
-                <Select value={widgetGroupBy} onValueChange={setWidgetGroupBy}>
-                  <SelectTrigger className="h-9 w-full">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {GROUP_BY.map((g) => (
-                      <SelectItem key={g} value={g}>
-                        {GROUP_LABELS[g] ?? g}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <div className="flex-1">
+                  <Combobox
+                    items={GROUP_BY.map((g) => GROUP_LABELS[g] ?? g)}
+                    value={GROUP_LABELS[widgetGroupBy] ?? widgetGroupBy}
+                    onValueChange={(label) => {
+                      const found = GROUP_BY.find((g) => (GROUP_LABELS[g] ?? g) === label)
+                      if (found) setWidgetGroupBy(found)
+                    }}
+                  >
+                    <ComboboxInput className="h-9 rounded-lg text-sm" placeholder="Select dimension" />
+                    <ComboboxContent>
+                      <ComboboxEmpty>No dimensions found.</ComboboxEmpty>
+                      <ComboboxList>
+                        {(item) => (
+                          <ComboboxItem key={item} value={item}>
+                            {item}
+                          </ComboboxItem>
+                        )}
+                      </ComboboxList>
+                    </ComboboxContent>
+                  </Combobox>
+                </div>
                 {widgetGroupBy === "time" && (
                   <Select value={viewBy} onValueChange={(v) => setViewBy(v as ViewByGranularity)}>
                     <SelectTrigger className="h-9 w-[120px]">
@@ -1167,7 +1327,7 @@ function BuilderForm({
         </div>
       </div>
 
-      <DialogFooter className="mx-0 mb-0 shrink-0 items-center rounded-none border-t bg-[#141414] px-7 py-3 sm:flex-row sm:justify-between">
+      <DialogFooter className="mx-0 mb-0 flex h-[57px] shrink-0 items-center rounded-none border-t bg-[#141414] px-7 py-0 sm:flex-row sm:justify-between">
         <p className={cn("max-w-xl text-[11px]", saveIssue ? "text-amber-400" : "text-text-muted")}>
           {saveIssue ?? summary}
         </p>
@@ -1193,17 +1353,11 @@ function BuilderForm({
           )
         }
         return (
-          <DialogPortal>
           <aside
             className={cn(
-              "fixed z-[60] flex flex-col rounded-lg border border-border bg-[#141414] shadow-2xl shadow-black/50 transition-[width] duration-200 ease-out",
-              filterCollapsed ? "w-[40px]" : "w-[316px]"
+              "relative flex h-full shrink-0 flex-col border-l border-border bg-[#141414] transition-[width] duration-200 ease-out",
+              filterCollapsed ? "w-[40px]" : "w-[300px]"
             )}
-            style={{
-              left: "calc(50% + 340px + 8px)",
-              top: "4vh",
-              bottom: "4vh",
-            }}
           >
             {filterCollapsed ? (
               <button
@@ -1216,27 +1370,9 @@ function BuilderForm({
               </button>
             ) : (
               <>
-                <div className="flex h-[57px] shrink-0 items-center justify-between border-b border-border px-4">
-                  <div className="flex items-center gap-2">
-                    <FunnelIcon className="size-3.5 text-text-muted" />
-                    <span className="text-[13px] font-semibold tracking-tight">Filters</span>
-                    {(() => {
-                      const c = block.filters.conditions.filter(conditionIsActive).length
-                      return c > 0 ? (
-                        <span className="ml-0.5 inline-flex h-4 min-w-4 items-center justify-center rounded bg-text px-1 text-[10px] font-medium text-bg">
-                          {c}
-                        </span>
-                      ) : null
-                    })()}
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setFilterCollapsed(true)}
-                    aria-label="Collapse filters"
-                    className="flex size-6 items-center justify-center rounded-md text-text-muted transition-colors hover:bg-surface-2 hover:text-text"
-                  >
-                    <ChevronRight className="size-3.5" />
-                  </button>
+                <div className="flex h-[57px] shrink-0 items-center gap-2 border-b px-7">
+                  <FunnelIcon className="size-4 text-text-muted" />
+                  <h2 className="font-heading text-base leading-none font-medium">Filters</h2>
                 </div>
                 <div className="min-h-0 flex-1">
                   <FilterMenu
@@ -1249,7 +1385,6 @@ function BuilderForm({
               </>
             )}
           </aside>
-          </DialogPortal>
         )
       })()}
     </div>

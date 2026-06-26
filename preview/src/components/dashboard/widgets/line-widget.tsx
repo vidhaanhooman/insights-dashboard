@@ -38,7 +38,7 @@ export function LineWidget({
         <Skeleton className="h-[200px] w-full" />
       ) : (
         <ChartContainer config={config} className="h-[200px] w-full">
-          <LineChart data={data} margin={{ top: 6, right: 8, left: -16 }}>
+          <LineChart data={data} margin={{ top: 6, right: 8, left: 4 }}>
             <CartesianGrid vertical={false} />
             <XAxis
               dataKey="label"
@@ -47,7 +47,7 @@ export function LineWidget({
               tickMargin={8}
               interval="preserveStartEnd"
             />
-            <YAxis tickLine={false} axisLine={false} width={36} allowDecimals={false} />
+            <YAxis tickLine={false} axisLine={false} width={44} allowDecimals={false} />
             <ChartTooltip content={<ChartTooltipContent />} />
             <Line
               dataKey="value"

@@ -81,7 +81,7 @@
   --accent-foreground: var(--text);
   --destructive: #dc2626;
   --input: var(--border-strong);
-  --ring: var(--brand);
+  --ring: var(--border-strong);
   --radius: 0.625rem;
   --chart-1: #3a6ae6;
   --chart-2: #6f9cf6;
@@ -120,7 +120,7 @@
   --accent-foreground: var(--text);
   --destructive: #f87171;
   --input: var(--border-strong);
-  --ring: var(--brand);
+  --ring: var(--border-strong);
 }
 
 @layer base {

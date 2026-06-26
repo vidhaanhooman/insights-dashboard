@@ -245,7 +245,7 @@ function AgentBarPanel({
     <PanelCard
       title="Calls by agent"
       onEdit={onEdit}
-      className="aspect-square w-full"
+      className="flex h-full min-h-[300px] w-full flex-col"
       dialogClassName="flex h-[90vh] w-[94vw] max-w-[94vw] flex-col sm:max-w-[94vw]"
       editContent={loading ? undefined : <BarDetail data={data} />}
       enlargeContent={loading ? undefined : <BarDetailView data={data} />}
@@ -256,7 +256,7 @@ function AgentBarPanel({
         <ChartContainer config={config} className="h-full min-h-[240px] w-full">
           <BarChart
             data={data}
-            margin={{ top: 8, right: 12, left: -12 }}
+            margin={{ top: 8, right: 12, left: 4, bottom: 8 }}
             barCategoryGap="28%"
           >
             <CartesianGrid vertical={false} />
@@ -464,16 +464,20 @@ export function OverviewPage() {
         </div>
 
         <div className="overflow-x-hidden px-7 py-6">
+          {tab === "Tasks" ? (
+            <TasksEmpty onAdd={openBuilder} />
+          ) : (
+          <>
           {/* Stats block + hero line */}
-          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+          <div className="grid grid-cols-1 gap-3 sm:gap-4 md:grid-cols-2">
             <StatCards range={range} refreshKey={refreshKey} />
             <ConversationsPanel range={range} refreshKey={refreshKey} />
           </div>
 
           {/* Calls attempted (left, fills) with the two square panels stacked on its right */}
-          <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
+          <div className="mt-3 grid grid-cols-1 gap-3 sm:mt-4 sm:gap-4 md:grid-cols-2">
             <CallsPanel range={range} refreshKey={refreshKey} fill />
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
               <OutcomePanel range={range} refreshKey={refreshKey} />
               <AgentBarPanel range={range} refreshKey={refreshKey} />
             </div>
@@ -520,6 +524,8 @@ export function OverviewPage() {
               </Button>
             </div>
           )}
+          </>
+          )}
         </div>
       </main>
 
@@ -557,6 +563,25 @@ export function OverviewPage() {
           )}
         </DialogContent>
       </Dialog>
+    </div>
+  )
+}
+
+function TasksEmpty({ onAdd }: { onAdd: () => void }) {
+  return (
+    <div className="flex min-h-[60vh] flex-col items-center justify-center gap-4 rounded-xl border border-dashed border-border px-6 py-12 text-center">
+      <div className="flex size-12 items-center justify-center rounded-xl bg-surface-2 text-text-muted">
+        <LayoutDashboard size={22} />
+      </div>
+      <div className="space-y-1">
+        <p className="text-base font-semibold text-text">No task metrics yet</p>
+        <p className="max-w-md text-sm text-text-muted">
+          Add metrics to see how tasks are being created, attempted, and connected here.
+        </p>
+      </div>
+      <Button onClick={onAdd}>
+        <Plus /> Make more metrics
+      </Button>
     </div>
   )
 }

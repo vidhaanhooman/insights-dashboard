@@ -2,6 +2,7 @@
 
 import * as React from "react"
 
+import { Button } from "@/components/ui/button"
 import { Switch } from "@/components/ui/switch"
 import {
   Combobox,
@@ -17,9 +18,13 @@ import {
 export function ChartDetail({
   chart,
   children,
+  onSave,
+  onCancel,
 }: {
   chart: React.ReactNode
   children: React.ReactNode
+  onSave?: () => void
+  onCancel?: () => void
 }) {
   const [railWidth, setRailWidth] = React.useState(260)
   const drag = React.useRef<{ x: number; w: number } | null>(null)
@@ -57,9 +62,19 @@ export function ChartDetail({
       </div>
       <aside
         style={{ width: railWidth }}
-        className="flex shrink-0 flex-col gap-5 overflow-y-auto pl-5"
+        className="flex shrink-0 flex-col pl-5"
       >
-        {children}
+        <div className="min-h-0 flex-1 space-y-5 overflow-y-auto pb-3">{children}</div>
+        <div className="-mx-5 mt-3 flex shrink-0 items-center justify-end gap-2 border-t border-border bg-surface-2/20 px-5 py-3">
+          {onCancel && (
+            <Button variant="ghost" size="sm" onClick={onCancel}>
+              Cancel
+            </Button>
+          )}
+          <Button size="sm" onClick={onSave}>
+            Save
+          </Button>
+        </div>
       </aside>
     </div>
   )
@@ -69,12 +84,12 @@ export function RailGroup({
   label,
   children,
 }: {
-  label: string
+  label?: string
   children: React.ReactNode
 }) {
   return (
     <div className="space-y-2.5">
-      <p className="text-[11px] font-medium text-text-muted">{label}</p>
+      {label && <p className="text-[11px] font-medium text-text-muted">{label}</p>}
       {children}
     </div>
   )

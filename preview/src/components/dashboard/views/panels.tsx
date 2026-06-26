@@ -285,7 +285,10 @@ export function PanelCard({
             </div>
           </DialogHeader>
           {enlargeContent ? (
-            <div className="flex min-h-0 flex-1 flex-col overflow-hidden">{enlargeContent}</div>
+            <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden">
+              <ChartToolbar />
+              {enlargeContent}
+            </div>
           ) : (
             <>
               <ChartToolbar />
@@ -390,7 +393,7 @@ export function LinePanel({
               fill ? "aspect-auto min-h-0 flex-1" : "h-[240px]"
             )}
           >
-            <LineChart data={data} margin={{ top: 8, right: 12, left: -12 }}>
+            <LineChart data={data} margin={{ top: 8, right: 12, left: 4 }}>
               <CartesianGrid vertical={false} strokeDasharray="3 3" />
               <XAxis
                 dataKey="label"
@@ -454,7 +457,7 @@ function Donut({
       <ChartContainer
         config={{ value: { label: "Calls" } } satisfies ChartConfig}
         // Responsive square — fills the card up to `size` and stays 1:1.
-        className="mx-auto aspect-square w-full shrink-0"
+        className="mx-auto aspect-square w-full max-w-full shrink min-h-0"
         style={{ maxWidth: size, maxHeight: size }}
       >
         <PieChart>
@@ -641,7 +644,7 @@ function PieQueryView({
 
   const barChart = (
     <ChartContainer config={{ value: { label: measure } } satisfies ChartConfig} className="h-[320px] w-full">
-      <BarChart data={rows} margin={{ top: 8, right: 12, left: -12 }}>
+      <BarChart data={rows} margin={{ top: 8, right: 12, left: 4 }}>
         <CartesianGrid vertical={false} />
         <XAxis dataKey="name" tickLine={false} axisLine={false} tickMargin={8} />
         <YAxis tickLine={false} axisLine={false} width={32} allowDecimals={false} />
@@ -711,25 +714,6 @@ function PieQueryView({
 
       {/* Result card — chart + breakdown side by side. */}
       <div className="rounded-xl border border-border">
-        <div className="flex items-center justify-between border-b border-border px-3 py-2">
-          {chartType === "Bar" ? (
-            <Combo value={granularity} items={["1 minute", "5 minutes", "30 minutes", "1 hour"]} onChange={setGranularity} width={130} />
-          ) : (
-            <span className="text-xs text-text-muted">
-              {agg} of {measure} · {groupLabel.toLowerCase()}
-            </span>
-          )}
-          <SegmentedToggle
-            size="sm"
-            value={chartType}
-            onChange={setChartType}
-            options={[
-              { value: "Bar", label: "Bar" },
-              { value: "Pie", label: "Pie" },
-              { value: "Table", label: "Table" },
-            ]}
-          />
-        </div>
         <div className="p-3">
           {chartType === "Table" ? (
             breakdown(filtered, true)
@@ -752,7 +736,7 @@ function PieQueryView({
             config={{ Attempted: { label: measure, color: "var(--chart-1)" } } satisfies ChartConfig}
             className="h-[220px] w-full"
           >
-            <LineChart data={series.data} margin={{ top: 8, right: 12, left: -12 }}>
+            <LineChart data={series.data} margin={{ top: 8, right: 12, left: 4 }}>
               <CartesianGrid vertical={false} strokeDasharray="3 3" />
               <XAxis dataKey="label" tickLine={false} axisLine={false} tickMargin={10} interval={0} />
               <YAxis tickLine={false} axisLine={false} width={32} allowDecimals={false} />
@@ -768,7 +752,7 @@ function PieQueryView({
             config={{ value: { label: measure, color: "var(--chart-1)" } } satisfies ChartConfig}
             className="h-[220px] w-full"
           >
-            <BarChart data={agentData.data} margin={{ top: 8, right: 12, left: -12 }}>
+            <BarChart data={agentData.data} margin={{ top: 8, right: 12, left: 4 }}>
               <CartesianGrid vertical={false} />
               <XAxis dataKey="name" tickLine={false} axisLine={false} tickMargin={8} />
               <YAxis tickLine={false} axisLine={false} width={32} allowDecimals={false} />
@@ -873,7 +857,7 @@ function PieEditView({
         <RailToggle label="Display as percentages" checked={percentages} onChange={setPercentages} />
         <RailToggle label="Show legend" checked={showLegend} onChange={setShowLegend} />
       </RailGroup>
-      <RailGroup label="Data">
+      <RailGroup>
         <RailCombo label="Measure" value={measure} onChange={setMeasure} items={["Calls", "Connected", "Pickup rate"]} />
         <RailCombo label="Aggregation" value="Sum" onChange={() => {}} items={["Sum", "Count", "Average", "Min", "Max"]} />
         <RailCombo label="Group by" value={groupLabel} onChange={setGroupLabel} items={GROUP_OPTIONS.map((o) => o.label)} />
@@ -947,11 +931,8 @@ function LineDetail({
           items={["Smooth", "Straight"]}
         />
       </RailGroup>
-      <RailGroup label="Data">
+      <RailGroup>
         <RailCombo label="Measure" value={measure} onChange={setMeasure} items={["Calls", "Connected", "Pickup rate"]} />
-        <RailCombo label="Aggregation" value={agg} onChange={setAgg} items={["Sum", "Count", "Average", "Min", "Max"]} />
-        <RailCombo label="Group by" value={groupLabel} onChange={setGroupLabel} items={GROUP_OPTIONS.map((o) => o.label)} />
-        <RailCombo label="Time range" value={timeRange} onChange={setTimeRange} items={["Last 6 hours", "Last 24 hours", "Last 7 days", "Last 30 days"]} />
         <RailCombo label="Show" value={show} onChange={setShow} items={["All", "Top 5", "Top 8"]} />
         <RailToggle label="Show ungrouped" checked={showUngrouped} onChange={setShowUngrouped} />
       </RailGroup>
@@ -962,7 +943,6 @@ function LineDetail({
           onPick={pick}
         />
       </RailGroup>
-      <FilterBuilder filters={filters} onChange={setFilters} />
     </ChartDetail>
   )
 }
@@ -975,13 +955,14 @@ export function BarDetail({
 }) {
   const [horizontal, setHorizontal] = React.useState(false)
   const [showValues, setShowValues] = React.useState(false)
-  const [sort, setSort] = React.useState("Descending")
-  const [measure, setMeasure] = React.useState("Calls")
-  const [agg, setAgg] = React.useState("Sum")
-  const [groupLabel, setGroupLabel] = React.useState("Agent")
-  const [timeRange, setTimeRange] = React.useState("Last 6 hours")
-  const [show, setShow] = React.useState("All")
-  const [showUngrouped, setShowUngrouped] = React.useState(false)
+  const [sort, setSort] = React.useState("Default")
+  const [showAverageLine, setShowAverageLine] = React.useState(false)
+  const [showLegend, setShowLegend] = React.useState(true)
+  const [xMeasure, setXMeasure] = React.useState("Agent")
+  const [xShow, setXShow] = React.useState("All")
+  const [yMeasure, setYMeasure] = React.useState("Calls")
+  const [yGroupBy, setYGroupBy] = React.useState("None")
+  const [showEmptyGroups, setShowEmptyGroups] = React.useState(false)
   const [filters, setFilters] = React.useState<FilterRow[]>([])
   const { colorFor, pick } = useChartColors(PIE_HEX)
 
@@ -1035,22 +1016,20 @@ export function BarDetail({
   return (
     <ChartDetail chart={chart}>
       <RailGroup label="Display">
+        <RailToggle label="Show average line" checked={showAverageLine} onChange={setShowAverageLine} />
+        <RailToggle label="Show data labels" checked={showValues} onChange={setShowValues} />
+        <RailToggle label="Show legend" checked={showLegend} onChange={setShowLegend} />
         <RailToggle label="Horizontal bars" checked={horizontal} onChange={setHorizontal} />
-        <RailToggle label="Show values" checked={showValues} onChange={setShowValues} />
-        <RailCombo
-          label="Sort"
-          value={sort}
-          onChange={setSort}
-          items={["Descending", "Ascending", "Default"]}
-        />
       </RailGroup>
-      <RailGroup label="Data">
-        <RailCombo label="Measure" value={measure} onChange={setMeasure} items={["Calls", "Connected", "Pickup rate"]} />
-        <RailCombo label="Aggregation" value={agg} onChange={setAgg} items={["Sum", "Count", "Average", "Min", "Max"]} />
-        <RailCombo label="Group by" value={groupLabel} onChange={setGroupLabel} items={GROUP_OPTIONS.map((o) => o.label)} />
-        <RailCombo label="Time range" value={timeRange} onChange={setTimeRange} items={["Last 6 hours", "Last 24 hours", "Last 7 days", "Last 30 days"]} />
-        <RailCombo label="Show" value={show} onChange={setShow} items={["All", "Top 5", "Top 8"]} />
-        <RailToggle label="Show ungrouped" checked={showUngrouped} onChange={setShowUngrouped} />
+      <RailGroup label="X-axis">
+        <RailCombo label="Measure" value={xMeasure} onChange={setXMeasure} items={GROUP_OPTIONS.map((o) => o.label)} />
+        <RailCombo label="Show" value={xShow} onChange={setXShow} items={["All", "Top 5", "Top 8", "Top 10"]} />
+        <RailCombo label="Sort by" value={sort} onChange={setSort} items={["Default", "Value (high to low)", "Value (low to high)", "Alphabetical"]} />
+      </RailGroup>
+      <RailGroup label="Y-axis">
+        <RailCombo label="Measure" value={yMeasure} onChange={setYMeasure} items={["Calls", "Connected", "Pickup rate", "Avg duration"]} />
+        <RailCombo label="Group by" value={yGroupBy} onChange={setYGroupBy} items={["None", ...GROUP_OPTIONS.map((o) => o.label)]} />
+        <RailToggle label="Show empty groups" checked={showEmptyGroups} onChange={setShowEmptyGroups} />
       </RailGroup>
       <RailGroup label="Colors">
         <RailColors
@@ -1252,7 +1231,7 @@ export function PiePanel({
       title={title}
       description={description}
       onEdit={onEdit}
-      className={square ? "aspect-square w-full" : undefined}
+      className={square ? "flex h-full min-h-[300px] w-full flex-col" : undefined}
       dialogClassName="flex h-[90vh] w-[94vw] max-w-[94vw] flex-col sm:max-w-[94vw]"
       enlargeContent={
         total > 0 ? (
@@ -1364,7 +1343,7 @@ export function TablePanel({
       }
       className="h-[360px] w-full"
     >
-      <BarChart data={rows} margin={{ top: 8, right: 12, left: -12 }}>
+      <BarChart data={rows} margin={{ top: 8, right: 12, left: 4 }}>
         <CartesianGrid vertical={false} />
         <XAxis dataKey={labelKey} tickLine={false} axisLine={false} tickMargin={8} />
         <YAxis tickLine={false} axisLine={false} width={36} allowDecimals={false} />

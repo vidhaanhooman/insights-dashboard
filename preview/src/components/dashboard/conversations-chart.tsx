@@ -46,7 +46,7 @@ function MultiLine({
 }) {
   return (
     <ChartContainer config={config} className="w-full" style={{ height }}>
-      <LineChart data={data} margin={{ top: 8, right: 12, left: -12, bottom: 0 }}>
+      <LineChart data={data} margin={{ top: 8, right: 12, left: 4, bottom: 0 }}>
         <CartesianGrid vertical={false} strokeDasharray="3 3" />
         <XAxis
           dataKey="label"
@@ -55,7 +55,7 @@ function MultiLine({
           tickMargin={10}
           minTickGap={24}
         />
-        <YAxis tickLine={false} axisLine={false} width={32} allowDecimals={false} />
+        <YAxis tickLine={false} axisLine={false} width={44} allowDecimals={false} />
         <ChartTooltip content={<ChartTooltipContent className="w-[170px]" />} />
         {SERIES.filter((k) => visible.has(k)).map((key) => (
           <Line
