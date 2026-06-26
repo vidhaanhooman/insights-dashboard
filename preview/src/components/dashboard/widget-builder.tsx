@@ -1237,8 +1237,8 @@ function BuilderForm({
               <div className="flex gap-2">
                 <div className="flex-1">
                   <Combobox
-                    items={GROUP_BY.map((g) => GROUP_LABELS[g] ?? g)}
-                    value={GROUP_LABELS[widgetGroupBy] ?? widgetGroupBy}
+                    items={GROUP_BY.filter((g) => g !== "None").map((g) => GROUP_LABELS[g] ?? g)}
+                    value={widgetGroupBy === "None" ? undefined : (GROUP_LABELS[widgetGroupBy] ?? widgetGroupBy)}
                     onValueChange={(label) => {
                       const found = GROUP_BY.find((g) => (GROUP_LABELS[g] ?? g) === label)
                       if (found) setWidgetGroupBy(found)
