@@ -33,12 +33,28 @@ export type WidgetType =
 export type ViewByGranularity = "Hour" | "Day" | "Month"
 
 export interface WidgetConfig {
+  /** Back-compat field used by current grouped chart renderers. */
   groupBy?: string
   viewBy?: ViewByGranularity
+  xAxis?: string
+  yAxis?: string
+  categoryAxis?: string
+  stackBy?: string
+  sliceBy?: string
+  rowsBy?: string
+  columnsBy?: string
+  colorBy?: string
+  valueMetricIds?: string[]
   /** Display options (mainly for pie/line). */
   donut?: boolean
   percentages?: boolean
   showLegend?: boolean
+  /** Number-widget formatting. */
+  numberPrefix?: string
+  numberSuffix?: string
+  numberDecimals?: number
+  /** Bar / line / table data-label toggle. */
+  showDataLabels?: boolean
 }
 
 export interface Widget {

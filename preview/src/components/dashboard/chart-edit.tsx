@@ -21,7 +21,7 @@ export function ChartDetail({
   chart: React.ReactNode
   children: React.ReactNode
 }) {
-  const [railWidth, setRailWidth] = React.useState(300)
+  const [railWidth, setRailWidth] = React.useState(260)
   const drag = React.useRef<{ x: number; w: number } | null>(null)
   const down = (e: React.PointerEvent) => {
     e.preventDefault()

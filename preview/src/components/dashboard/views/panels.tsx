@@ -285,7 +285,7 @@ export function PanelCard({
             </div>
           </DialogHeader>
           {enlargeContent ? (
-            <div className="min-h-0 flex-1 overflow-hidden">{enlargeContent}</div>
+            <div className="flex min-h-0 flex-1 flex-col overflow-hidden">{enlargeContent}</div>
           ) : (
             <>
               <ChartToolbar />

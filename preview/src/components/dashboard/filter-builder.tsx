@@ -4,14 +4,15 @@ import * as React from "react"
 import { Plus, Trash2 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
+  Combobox,
+  ComboboxContent,
+  ComboboxEmpty,
+  ComboboxInput,
+  ComboboxItem,
+  ComboboxList,
+} from "@/components/ui/combobox"
+import { Input } from "@/components/ui/input"
 import { cn } from "@/lib/utils"
 
 export interface FilterRow {
@@ -41,18 +42,22 @@ function MiniSelect({
   className?: string
 }) {
   return (
-    <Select value={value} onValueChange={onChange}>
-      <SelectTrigger className={cn("h-9 w-full min-w-0", className)}>
-        <SelectValue />
-      </SelectTrigger>
-      <SelectContent>
-        {options.map((o) => (
-          <SelectItem key={o} value={o}>
-            {o}
-          </SelectItem>
-        ))}
-      </SelectContent>
-    </Select>
+    <Combobox items={options} value={value} onValueChange={onChange}>
+      <ComboboxInput
+        placeholder="Select"
+        className={cn("h-9 w-full min-w-0 rounded-lg text-sm", className)}
+      />
+      <ComboboxContent>
+        <ComboboxEmpty>No items found.</ComboboxEmpty>
+        <ComboboxList>
+          {(item) => (
+            <ComboboxItem key={item} value={item}>
+              {item}
+            </ComboboxItem>
+          )}
+        </ComboboxList>
+      </ComboboxContent>
+    </Combobox>
   )
 }
 
@@ -92,7 +97,7 @@ export function FilterBuilder({
       ) : (
         <div className="space-y-2 rounded-lg border border-border bg-surface-2/30 p-2.5">
           {filters.map((f, i) => (
-            <div key={f.id} className="group flex items-center gap-2">
+            <div key={f.id} className="group grid gap-2 sm:grid-cols-[44px_minmax(0,1fr)_96px_minmax(140px,1fr)_32px] sm:items-center">
               <span className="w-9 shrink-0 text-xs font-medium text-text-muted">
                 {i === 0 ? "Where" : "And"}
               </span>
@@ -100,13 +105,13 @@ export function FilterBuilder({
                 value={f.field}
                 options={FILTER_FIELDS}
                 onChange={(v) => patch(f.id, { field: v })}
-                className="flex-1"
+                className="min-w-0"
               />
               <MiniSelect
                 value={f.op}
                 options={OPERATORS}
                 onChange={(v) => patch(f.id, { op: v })}
-                className="w-[76px] shrink-0"
+                className="min-w-0"
               />
               <Input
                 value={f.value}

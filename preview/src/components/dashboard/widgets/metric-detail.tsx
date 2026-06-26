@@ -129,10 +129,10 @@ export function MetricDetail({
             <Skeleton className="h-[300px] w-full" />
           ) : (
             <ChartContainer config={barConfig} className="h-[300px] w-full">
-              <BarChart data={attempts.data} margin={{ top: 8, right: 12, left: -12 }}>
+              <BarChart data={attempts.data} margin={{ top: 8, right: 12, left: 0 }}>
                 <CartesianGrid vertical={false} />
                 <XAxis dataKey="attempt" tickLine={false} axisLine={false} tickMargin={8} />
-                <YAxis tickLine={false} axisLine={false} width={36} domain={[0, 100]} />
+                <YAxis tickLine={false} axisLine={false} width={44} domain={[0, 100]} />
                 <ChartTooltip cursor={false} content={<ChartTooltipContent />} />
                 <Bar dataKey="pickup" fill="var(--chart-1)" radius={[4, 4, 0, 0]} maxBarSize={64} />
               </BarChart>
@@ -210,10 +210,10 @@ export function MetricDetail({
           <Skeleton className="h-[240px] w-full" />
         ) : (
           <ChartContainer config={lineConfig} className="h-[240px] w-full">
-            <LineChart data={byTime.data} margin={{ top: 8, right: 12, left: -12 }}>
+            <LineChart data={byTime.data} margin={{ top: 8, right: 12, left: 0 }}>
               <CartesianGrid vertical={false} strokeDasharray="3 3" />
               <XAxis dataKey="label" tickLine={false} axisLine={false} tickMargin={8} minTickGap={24} />
-              <YAxis tickLine={false} axisLine={false} width={36} domain={[0, 100]} />
+              <YAxis tickLine={false} axisLine={false} width={44} domain={[0, 100]} />
               <ChartTooltip content={<ChartTooltipContent />} />
               <Line
                 dataKey="value"

@@ -11,9 +11,20 @@ import type { Metric, Widget, WidgetType } from "./types"
 
 export const SYSTEM_METRICS: Metric[] = [
   { id: "calls", label: "Calls attempted", owner: "system", format: "count", source: { kind: "system", key: "calls" } },
-  { id: "connected", label: "Calls connected", owner: "system", format: "count", source: { kind: "system", key: "connected" } },
+  { id: "connected", label: "Connected call count", owner: "system", format: "count", source: { kind: "system", key: "connected" } },
   { id: "pickup", label: "Pickup rate", owner: "system", format: "percent", source: { kind: "derived", expr: "connected/calls" } },
   { id: "avgdur", label: "Avg duration", owner: "system", format: "duration", source: { kind: "system", key: "avgdur" } },
+  { id: "turns", label: "Turns", owner: "system", format: "count", source: { kind: "system", key: "turns" } },
+  { id: "init_fail", label: "Call initiation failed count", owner: "system", format: "count", source: { kind: "system", key: "init_fail" } },
+  { id: "stt_cost", label: "STT cost", owner: "system", format: "currency", source: { kind: "system", key: "stt_cost" } },
+  { id: "fail_rate", label: "Call failure rate", owner: "system", format: "percent", source: { kind: "derived", expr: "failed/calls" } },
+  { id: "convs", label: "Conversation count", owner: "system", format: "count", source: { kind: "system", key: "convs" } },
+  { id: "llm_cost", label: "LLM cost", owner: "system", format: "currency", source: { kind: "system", key: "llm_cost" } },
+  { id: "avg_resp_len", label: "Avg response length", owner: "system", format: "count", source: { kind: "system", key: "avg_resp_len" } },
+  { id: "unique_callers", label: "Unique callers (inbound)", owner: "system", format: "count", source: { kind: "system", key: "unique_callers" } },
+  { id: "voicemail_count", label: "Voicemail call count", owner: "system", format: "count", source: { kind: "system", key: "voicemail_count" } },
+  { id: "voicemail_rate", label: "Voicemail rate", owner: "system", format: "percent", source: { kind: "derived", expr: "voicemail/calls" } },
+  { id: "agent_interrupts", label: "Agent interruption frequency", owner: "system", format: "count", source: { kind: "system", key: "agent_interrupts" } },
 ]
 
 export const VIZ: { type: WidgetType; label: string; Icon: LucideIcon }[] = [
